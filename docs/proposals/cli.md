@@ -16,7 +16,7 @@ kudoctl is the official cli client implementation for kudo.
 
 | Code | Category             | Description                                                                      |
 | ---- | -------------------- | -------------------------------------------------------------------------------- |
-| 0    | Sucess               | The command was successful.                                                      |
+| 0    | Success              | The command was successful.                                                      |
 | 2    | Syntax error         | The syntax of the command was not correct.                                       |
 | 3    | Connection error     | A connectivity error or protocol error occurred.                                 |
 | 4    | Server error         | An error occurred during a call to the controller.                               |
@@ -36,65 +36,103 @@ kudoctl is the official cli client implementation for kudo.
 
 Command format : `kudoctl [global options] <command> [command options]`.
 
-___
+---
+
 ### get nodes
 
 Get a list of the nodes registered to the control plane.
 
-**Parameters** :  
+**Flags** :
 
-`--help | -h` : show help of the function
+| Name     | Shorthand | Values               | Default        | Description                |
+| -------- | --------- | -------------------- | -------------- | -------------------------- |
+| `--help` | `-h`      |                      | false          | show help of the function. |
+| `--fmt`  |           | json, human-readable | human-readable | set format.                |
 
 **Examples** :
 
 TODO
 
-___
+---
 
 ### get node \<id\>
 
-Get detailed informations about a node.
+Get detailed information about a node.
 
-**Arguments** :  
+**Arguments** :
 
 `id` : the id of the node
 
-**Parameters** :  
+**Flags** :
 
-`--help | -h` : show help of the function.  
-`--fmt` : set format TODO: add formats.  
+| Name     | Shorthand | Values               | Default        | Description                |
+| -------- | --------- | -------------------- | -------------- | -------------------------- |
+| `--help` | `-h`      |                      | false          | show help of the function. |
+| `--fmt`  |           | json, human-readable | human-readable | set format.                |
 
-**Examples** :  
+**Examples** :
 
 TODO
-____
+
+---
 
 ### get workloads
 
-___
+---
 
 ### get workload \<id\>
 
-___
+---
 
 ### get instances
 
-___
+Get the list of instances and the name of the workload.
+
+---
 
 ### get instance \<id\>
 
-___
+Get details about the instance.
+
+**Arguments** :
+
+`id` : the id of the instance
+
+---
 
 ### delete workload \<id\>
 
-___
+Delete a workload definition.
+
+**Arguments** :
+
+`id` : the id of the workload
+
+---
 
 ### delete instance \<id\>
 
-___
+Delete and stop an instance.
+
+**Arguments** :
+
+`id` : the id of the instance
+
+---
 
 ### create workload
 
-___
+Create a workload definition
+
+**Flags** :
+`--file <file> | -f <file>` : add workload definition from file.
+
+---
 
 ## instantiate workload \<id\>
+
+Instantiate and start a workload
+
+**Arguments** :
+
+`id` : the id of the workload
