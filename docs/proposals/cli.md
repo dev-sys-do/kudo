@@ -17,6 +17,7 @@ kudoctl is the official cli client implementation for kudo.
 | Code | Category             | Description                                                                      |
 | ---- | -------------------- | -------------------------------------------------------------------------------- |
 | 0    | Success              | The command was successful.                                                      |
+| 1    | Unexpected error     | This is an unhandled error and it should never happen in normal usage            |
 | 2    | Syntax error         | The syntax of the command was not correct.                                       |
 | 3    | Connection error     | A connectivity error or protocol error occurred.                                 |
 | 4    | Server error         | An error occurred during a call to the controller.                               |
@@ -47,11 +48,11 @@ Get a list of the nodes registered to the control plane.
 | Name             | Shorthand | Values                                          | Default | Description                                                                                                                                                      |
 | ---------------- | --------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--help`         | `-h`      |                                                 | false   | show help of the function.                                                                                                                                       |
-| `-format`        | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
-| `-verbose`       | `-v`      |                                                 | false   | Specifies whether to enable verbose mode. Use the default value of off to disable verbose mode. This option is the default value. Use on to enable verbose mode. |
-| `-page`          | `-p`      |                                                 | false   | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
-| `-rows <number>` | `-r`      |                                                 | 24      | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
-| `-header`        | `-hdr`    |                                                 | true    | Specifies whether to display the table header. Use the default value of on to display the table header. Use off to hide the table header.                        |
+| `--format`        | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
+| `--verbose`       | `-v`      |                                                 | false   | Specifies whether to enable verbose mode. Use the default value of off to disable verbose mode. This option is the default value. Use on to enable verbose mode. |
+| `--page`          | `-p`      |                                                 | false   | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
+| `--rows <number>` | `-r`      |                                                 | 24      | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
+| `--header`        | `-hdr`    |                                                 | true    | Specifies whether to display the table header. Use the default value of on to display the table header. Use off to hide the table header.                        |
 
 **Examples** :
 
@@ -72,7 +73,7 @@ Get detailed information about a node.
 | Name      | Shorthand | Values                                          | Default | Description                         |
 | --------- | --------- | ----------------------------------------------- | ------- | ----------------------------------- |
 | `--help`  | `-h`      |                                                 | false   | show help of the function.          |
-| `-format` | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output. |
+| `--format` | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output. |
 
 **Examples** :
 
@@ -91,16 +92,27 @@ Get a list of the workloads...
 | Name             | Shorthand | Values                                          | Default | Description                                                                                                                                                      |
 | ---------------- | --------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--help`         | `-h`      |                                                 | false   | show help of the function.                                                                                                                                       |
-| `-format`        | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
-| `-verbose`       | `-v`      |                                                 | false   | Specifies whether to enable verbose mode. Use the default value of off to disable verbose mode. This option is the default value. Use on to enable verbose mode. |
-| `-page`          | `-p`      |                                                 | false   | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
-| `-rows <number>` | `-r`      |                                                 | 24      | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
-| `-header`        | `-hdr`    |                                                 | true    | Specifies whether to display the table header. Use the default value of on to display the table header. Use off to hide the table header.                        |
+| `--format`        | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
+| `--verbose`       | `-v`      |                                                 | false   | Specifies whether to enable verbose mode. Use the default value of off to disable verbose mode. This option is the default value. Use on to enable verbose mode. |
+| `--page`          | `-p`      |                                                 | false   | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
+| `--rows <number>` | `-r`      |                                                 | 24      | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
+| `--header`        | `-hdr`    |                                                 | true    | Specifies whether to display the table header. Use the default value of on to display the table header. Use off to hide the table header.                        |
 
 ---
 
 ### get workload \<id\>
 
+This function returns the definition of a workload with the specified `id`.
+
+**Arguments :**  
+
+`id` : the id of the instance.
+
+**Flags :**  
+
+| Name     | Shorthand | Values              | Default | Description                                                            |
+| -------- | --------- | ------------------- | ------- | ---------------------------------------------------------------------- |
+| ---format |           | `json`,`yaml`,`yml` | `yaml`  | The output format of the workload definition,  yml is the same as yaml |
 ---
 
 ### get instances
@@ -112,11 +124,11 @@ Get the list of instances and the name of the workload.
 | Name             | Shorthand | Values                                          | Default | Description                                                                                                                                                      |
 | ---------------- | --------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--help`         | `-h`      |                                                 | false   | show help of the function.                                                                                                                                       |
-| `-format`        | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
-| `-verbose`       | `-v`      |                                                 | false   | Specifies whether to enable verbose mode. Use the default value of off to disable verbose mode. This option is the default value. Use on to enable verbose mode. |
-| `-page`          | `-p`      |                                                 | false   | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
-| `-rows <number>` | `-r`      |                                                 | 24      | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
-| `-header`        | `-hdr`    |                                                 | true    | Specifies whether to display the table header. Use the default value of on to display the table header. Use off to hide the table header.                        |
+| `--format`        | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
+| `--verbose`       | `-v`      |                                                 | false   | Specifies whether to enable verbose mode. Use the default value of off to disable verbose mode. This option is the default value. Use on to enable verbose mode. |
+| `--page`          | `-p`      |                                                 | false   | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
+| `--rows <number>` | `-r`      |                                                 | 24      | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
+| `--header`        | `-hdr`    |                                                 | true    | Specifies whether to display the table header. Use the default value of on to display the table header. Use off to hide the table header.                        |
 
 ---
 
@@ -132,7 +144,7 @@ Get details about the instance.
 
 ### delete workload \<id\>
 
-Delete a workload definition.
+Delete a workload definition and all the instances of this workload. On success the command outputs no information.
 
 **Arguments** :
 
@@ -142,7 +154,7 @@ Delete a workload definition.
 
 ### delete instance \<id\>
 
-Delete and stop an instance.
+Delete and stop an instance. On success the command outputs no information.
 
 **Arguments** :
 
@@ -152,13 +164,14 @@ Delete and stop an instance.
 
 ### create workload
 
-Create a workload definition
+Create a workload definition. By default if a workload with the same name exists, the workload will be updated, add the `--no-update` flag if you don’t want this behavior.
 
 **Flags** :
 
-| Name  | Shorthand | Values | Default | Description                        |
-| ----- | --------- | ------ | ------- | ---------------------------------- |
-| files | f         | Path   | `''`    | add workload definition from file. |
+| Name        | Shorthand | Values | Default | Description                                    |
+| ----------- | --------- | ------ | ------- | ---------------------------------------------- |
+| --files     | -f        | Path   | `''`    | add workload definition from file.             |
+| --no-update |           | bool   | false   | If the workload doesn’t exist, don’t update it |
 
 **Examples :**
 
@@ -167,6 +180,10 @@ Create a workload definition
   ```sh
   kudoctl create workload -f workload.yml
   ```
+
+### apply
+
+This command takes the same arguments as `create workload`, creates a workload, then instanciate it.
 
 ---
 
