@@ -2,6 +2,15 @@
 
 A schema that can be sent to the controller in order to create a ressource.
 
+Example :
+
+```json
+{
+    "name": "test",
+    "type": "test",
+    ...
+}
+
 ## name
 
 **type :** string  

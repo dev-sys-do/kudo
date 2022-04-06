@@ -1,5 +1,22 @@
 # Workload schema
 
+Example :
+
+```json
+{
+    "name": "test-workload",
+    "type": "container",
+    "executable": "nginx",
+    "ressources": {
+        "cpu": 1,
+        "ram": 2048,
+        "disk": 2,
+    },
+    "ports": [
+        "8080:80"
+    ]
+}
+```
 ## name
 
 **type :** string
