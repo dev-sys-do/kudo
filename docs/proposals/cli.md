@@ -45,10 +45,10 @@ Get a list of the nodes registered to the control plane.
 
 **Flags** :
 
-| Name             | Shorthand | Values                                          | Default | Description                                                                                                                                                      |
-| ---------------- | --------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--help`         | `-h`      |                                                 | false   | show help of the function.                                                                                                                                       |
-| `--format`        | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
+| Name              | Shorthand | Values                                          | Default | Description                                                                                                                                                      |
+| ----------------- | --------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--help`          | `-h`      |                                                 | false   | show help of the function.                                                                                                                                       |
+| `--format`        | `-F`      | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
 | `--verbose`       | `-v`      |                                                 | false   | Specifies whether to enable verbose mode. Use the default value of off to disable verbose mode. This option is the default value. Use on to enable verbose mode. |
 | `--page`          | `-p`      |                                                 | false   | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
 | `--rows <number>` | `-r`      |                                                 | 24      | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
@@ -70,10 +70,10 @@ Get detailed information about a node.
 
 **Flags** :
 
-| Name      | Shorthand | Values                                          | Default | Description                         |
-| --------- | --------- | ----------------------------------------------- | ------- | ----------------------------------- |
-| `--help`  | `-h`      |                                                 | false   | show help of the function.          |
-| `--format` | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output. |
+| Name       | Shorthand | Values                                          | Default | Description                         |
+| ---------- | --------- | ----------------------------------------------- | ------- | ----------------------------------- |
+| `--help`   | `-h`      |                                                 | false   | show help of the function.          |
+| `--format` | `-F`      | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output. |
 
 **Examples** :
 
@@ -81,18 +81,18 @@ TODO
 
 ---
 
-### get workloads
+### get resources
 
-Get a list of the workloads...
+Get a list of the resources...
 
 <!-- TODO: more description -->
 
 **Flags** :
 
-| Name             | Shorthand | Values                                          | Default | Description                                                                                                                                                      |
-| ---------------- | --------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--help`         | `-h`      |                                                 | false   | show help of the function.                                                                                                                                       |
-| `--format`        | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
+| Name              | Shorthand | Values                                          | Default | Description                                                                                                                                                      |
+| ----------------- | --------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--help`          | `-h`      |                                                 | false   | show help of the function.                                                                                                                                       |
+| `--format`        | `-F`      | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
 | `--verbose`       | `-v`      |                                                 | false   | Specifies whether to enable verbose mode. Use the default value of off to disable verbose mode. This option is the default value. Use on to enable verbose mode. |
 | `--page`          | `-p`      |                                                 | false   | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
 | `--rows <number>` | `-r`      |                                                 | 24      | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
@@ -100,9 +100,9 @@ Get a list of the workloads...
 
 ---
 
-### get workload \<id\>
+### get resource \<id\>
 
-This function returns the definition of a workload with the specified `id`.
+This function returns the definition of a resource with the specified `id`.
 
 **Arguments :**  
 
@@ -110,21 +110,21 @@ This function returns the definition of a workload with the specified `id`.
 
 **Flags :**  
 
-| Name     | Shorthand | Values              | Default | Description                                                            |
-| -------- | --------- | ------------------- | ------- | ---------------------------------------------------------------------- |
-| ---format |           | `json`,`yaml`,`yml` | `yaml`  | The output format of the workload definition,  yml is the same as yaml |
+| Name      | Shorthand | Values              | Default | Description                                                            |
+| --------- | --------- | ------------------- | ------- | ---------------------------------------------------------------------- |
+| ---format |           | `json`,`yaml`,`yml` | `yaml`  | The output format of the resource definition,  yml is the same as yaml |
 ---
 
 ### get instances
 
-Get the list of instances and the name of the workload.
+Get the list of instances and the name of the resource.
 
 **Flags** :
 
-| Name             | Shorthand | Values                                          | Default | Description                                                                                                                                                      |
-| ---------------- | --------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--help`         | `-h`      |                                                 | false   | show help of the function.                                                                                                                                       |
-| `--format`        | `-fmt`    | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
+| Name              | Shorthand | Values                                          | Default | Description                                                                                                                                                      |
+| ----------------- | --------- | ----------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--help`          | `-h`      |                                                 | false   | show help of the function.                                                                                                                                       |
+| `--format`        | `-F`      | `json`, `default`, `xml`, `delimit <character>` | default | Specifies the format of the output.                                                                                                                              |
 | `--verbose`       | `-v`      |                                                 | false   | Specifies whether to enable verbose mode. Use the default value of off to disable verbose mode. This option is the default value. Use on to enable verbose mode. |
 | `--page`          | `-p`      |                                                 | false   | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
 | `--rows <number>` | `-r`      |                                                 | 24      | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
@@ -142,13 +142,13 @@ Get details about the instance.
 
 ---
 
-### delete workload \<id\>
+### delete resource \<id\>
 
-Delete a workload definition and all the instances of this workload. On success the command outputs no information.
+Delete a resource definition and all the instances of this resource. On success the command outputs no information.
 
 **Arguments** :
 
-`id` : the id of the workload
+`id` : the id of the resource
 
 ---
 
@@ -158,39 +158,66 @@ Delete and stop an instance. On success the command outputs no information.
 
 **Arguments** :
 
-`id` : the id of the instance
+`id` : the id of the instance.
 
 ---
 
-### create workload
+### create \<kind\>
 
-Create a workload definition. By default if a workload with the same name exists, the workload will be updated, add the `--no-update` flag if you don’t want this behavior.
+Create a resource definition. By default if a resource with the same name exists, the resource will be updated, add the `--no-update` flag if you don’t want this behavior.
+
+**Arguments :**
+
+`kind` : the kind of the ressource, possible values :
+
+- workload
 
 **Flags** :
 
-| Name        | Shorthand | Values | Default | Description                                    |
-| ----------- | --------- | ------ | ------- | ---------------------------------------------- |
-| --files     | -f        | Path   | `''`    | add workload definition from file.             |
-| --no-update |           | bool   | false   | If the workload doesn’t exist, don’t update it |
+| Name        | Shorthand | Values | Default | Description                                     |
+| ----------- | --------- | ------ | ------- | ----------------------------------------------- |
+| --file      | -f        | Path   | `""`    | add resource definition from file.              |
+| --no-update |           | bool   | false   | If the resource already exists, don’t update it |
+| --name      |           | string | ""      | set the name of the resource                    |
+
+**Kind specific flags :**
+
+*workload :*
+
+| Name             | Shorthand | Values   | Default       | Description                                                                           |
+| ---------------- | --------- | -------- | ------------- | ------------------------------------------------------------------------------------- |
+| --type           |           | string   | `"container"` | workload type                                                                         |
+| --uri            |           | string   | ""            | the uri                                                                               |
+| --resources-cpu  |           | integer  | 1             | the cpu amount                                                                        |
+| --resources-ram  |           | integer  | 50            | the ram amount      (MB)                                                              |
+| --resources-disk |           | integer  | 1             | the disk size (GB)                                                                    |
+| --port           | -p        | []string | []            | ports binding list, use multiple times to add multiple elements to the array          |
+| --environment    |           | []string | []            | environment variables list, use multiple times to add multiple elements  to the array |
 
 **Examples :**
 
-- Add workload from file
+- Add resource from file
 
   ```sh
-  kudoctl create workload -f workload.yml
+  kudoctl create resource -f workload.yml
   ```
 
 ### apply
 
-This command takes the same arguments as `create workload`, creates a workload, then instanciate it.
+This command takes the same arguments as `create <kind>` except the kind is defined by the `--kind` flag , creates a resource, then instanciate it.
+
+**Flags :**
+
+| Name   | Shorthand | Values | Default      | Description    |
+| ------ | --------- | ------ | ------------ | -------------- |
+| --kind |           | string | `"workload"` | ressource kind |
 
 ---
 
-## instantiate workload \<id\>
+## instantiate \<ressource-id\>
 
-Instantiate and start a workload
+Instantiate and start a resource
 
 **Arguments** :
 
-`id` : the id of the workload
+`ressource-id` : the id of the resource
