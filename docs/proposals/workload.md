@@ -4,24 +4,23 @@ Example :
 
 ```json
 {
-    "name": "test-workload",
+    "kind" : "workload",
     "type": "container",
-    "executable": "nginx",
+    "name": "test-workload",
+    "uri": "nginx",
     "ressources": {
-        "cpu": 1,
+        "cpu": 1.0,
         "ram": 2048,
         "disk": 2,
     },
     "ports": [
         "8080:80"
+    ],
+    "environment": [
+        "NODE_ENV=production"
     ]
 }
 ```
-## name
-
-**type :** string
-
-Name of the workload, should be unique in the controller’s database.
 
 ## type
 
@@ -33,13 +32,17 @@ Type of the workload :
 - `"vm"`
 - `"binary"`
 
-## executable
+## name
 
 **type :** string
 
-<!-- maybe change name -->
+Name of the workload, should be unique in the controller’s database.
 
-The name of the container image , or an URI to the vm image or binary executable.
+## uri
+
+**type :** string
+
+The name/uri of the container image , or an URI to the vm image or binary executable.
 
 ## ressources
 
@@ -49,9 +52,9 @@ Definition of the maximum (container, binary) or allocated (vm) ressources.
 
 ### ressources.cpu
 
-**type :** TDB
+**type :** float
 
-CPU power, unit is to be defined.
+CPU power, in number of cores allocated as a floating number.
 
 ### ressources.ram
 
@@ -70,3 +73,9 @@ Disk size, unit is GB.
 **type :** Array\<string\>
 
 List of port mapping with the format `"external:internal"`.
+
+## environment
+
+**type :** Array\<string\>
+
+List of environment variables to set before the execution of the workload, format is `"KEY=VALUE"`
