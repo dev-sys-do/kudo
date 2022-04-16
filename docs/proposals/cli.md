@@ -2,6 +2,16 @@
 
 kudoctl is the official cli client implementation for kudo.
 
+## Definitions
+
+**Node :** A machine running the kudo agent.
+
+**Workload :** A definition of a task (executable/virtual machine/container) to execute.
+
+**Ressource :** A definition of a user or a workload, something that can be defined and sent to the kudo controller.
+
+**Instance :** A ressource that has been applied to the kudo nodes/cluster, example : an instance of a container workload is representing the container running with the arguments of the workload definition.
+
 ## Global flags
 
 | Name              | Shorthand | Values     | Default        | Description                                                                       |
@@ -141,8 +151,8 @@ Get details about the instance.
 
 **Flags :**  
 
-| Name      | Shorthand | Values                                       | Default            | Description                                                            |
-| --------- | --------- | -------------------------------------------- | ------------------ | ---------------------------------------------------------------------- |
+| Name     | Shorthand | Values                                       | Default            | Description                                                            |
+| -------- | --------- | -------------------------------------------- | ------------------ | ---------------------------------------------------------------------- |
 | --format |           | `"json"`,`"human_readable"`,`"yaml"`,`"xml"` | `"human_readable"` | The output format of the resource definition,  yml is the same as yaml |
 
 </details>
