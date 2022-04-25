@@ -62,8 +62,15 @@ Get a list of the nodes registered to the control plane.
 | --page    | -p        |                                                                         | false              | Specifies whether to display one page of text at a time or all text at one time.                                                                                 |
 | --rows    | -r        | integer                                                                 | 24                 | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
 | --header  | -h        |                                                                         | true               | Specifies whether to display the table header. Use the default value of on to display the table header. Use off to hide the table header.                        |
+
+**Example:**
+
+```bash
+kudoctl get nodes
+```
+
 </details>
-  
+
 ---
 
 <details> <summary><h3>get node &lt;id&gt; </h3></summary>
@@ -81,6 +88,12 @@ Get detailed information about a node.
 | --help   | -h        |                                                                          | false              | show help of the function.          |
 | --format | -F        | `"json"`,`"human_readable"`,  `"yaml"`, `"xml"`, `"delimit <character>"` | `"human_readable"` | Specifies the format of the output. |
     
+
+**Example:**
+
+```bash
+kudoctl get node id6875
+```
 </details>
 
 ---
@@ -100,8 +113,13 @@ Get a list of the resources...
 | --rows    | -r        | integer                                                                 | 24                 | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
 | --header  | -h        |                                                                         | true               | Specifies whether to display the table header. Use the default value of on to display the table header. Use off to hide the table header.                        |
 
+**Example:**
+
+```bash
+kudoctl get resources
+```
 </details>
-  
+
 ---
 
 <details> <summary><h3>get resource &lt;id&gt;</h3></summary>
@@ -118,8 +136,14 @@ This function returns the definition of a resource with the specified `id`.
 | --------- | --------- | -------------------------------------------- | ------------------ | ---------------------------------------------------------------------- |
 | ---format |           | `"json"`,`"human_readable"`,`"yaml"`,`"xml"` | `"human_readable"` | The output format of the resource definition,  yml is the same as yaml |
   
-</details>
+**Example:**
+
+```bash
+kudoctl get resource id87967
+```
   
+</details>
+
 ---
 
 <details> <summary><h3>get instances</h3></summary>
@@ -137,8 +161,14 @@ Get the list of instances and the name of the resource.
 | --rows    | -r        | integer                                                                 | 24                 | Specifies the number of rows per page to display when the **-p** parameter is on. You can specify a value in the range 1 - 100.                                  |
 | --header  | -h        |                                                                         | true               | Specifies whether to display the table header. Use the default value of on to display the table header. Use off to hide the table header.                        |
 
+**Example:**
+
+```bash
+kudoctl get instances
+```
+
 </details>
-  
+
 ---
 
 <details> <summary><h3>get instance &lt;id&gt;</h3></summary>
@@ -155,6 +185,11 @@ Get details about the instance.
 | -------- | --------- | -------------------------------------------- | ------------------ | ---------------------------------------------------------------------- |
 | --format |           | `"json"`,`"human_readable"`,`"yaml"`,`"xml"` | `"human_readable"` | The output format of the resource definition,  yml is the same as yaml |
 
+**Example:**
+
+```bash
+kudoctl get instance id9878
+```
 </details>
   
 ---
@@ -167,8 +202,14 @@ Delete a resource definition and all the instances of this resource. On success 
 
 `id` : the id of the resource
 
+**Example:**
+
+```bash
+kudoctl delete resource id8989
+```
+
 </details>
-  
+
 ---
 
 <details> <summary><h3>delete instance &lt;id&gt;</h3></summary>
@@ -178,6 +219,12 @@ Delete and stop an instance. On success the command outputs no information.
 **Arguments** :
 
 `id` : the id of the instance.
+
+**Example:**
+
+```bash
+kudoctl delete instance id9898
+```
   
 </details>
 
@@ -237,6 +284,14 @@ This command takes the same arguments as `create <kind>` except the kind is defi
 | ------ | --------- | ------ | ------------ | ------------- |
 | --kind |           | string | `"workload"` | resource kind |
   
+
+**Example:**
+
+```bash
+kudoctl apply -f workload.yml
+```
+
+
 </details>
 
 ---
@@ -248,5 +303,11 @@ Instantiate and start a resource
 **Arguments** :
 
 `resource-id` : the id of the resource
+
+**Example:**
+
+```bash
+kudoctl instantiate id9809
+```
 
 </details>
