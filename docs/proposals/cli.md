@@ -87,13 +87,13 @@ Get detailed information about a node.
 | -------- | --------- | ------------------------------------------------------------------------ | ------------------ | ----------------------------------- |
 | --help   | -h        |                                                                          | false              | show help of the function.          |
 | --format | -F        | `"json"`,`"human_readable"`,  `"yaml"`, `"xml"`, `"delimit <character>"` | `"human_readable"` | Specifies the format of the output. |
-    
 
 **Example:**
 
 ```bash
 kudoctl get node id6875
 ```
+
 </details>
 
 ---
@@ -118,6 +118,7 @@ Get a list of the resources...
 ```bash
 kudoctl get resources
 ```
+
 </details>
 
 ---
@@ -135,7 +136,8 @@ This function returns the definition of a resource with the specified `id`.
 | Name      | Shorthand | Values                                       | Default            | Description                                                            |
 | --------- | --------- | -------------------------------------------- | ------------------ | ---------------------------------------------------------------------- |
 | ---format |           | `"json"`,`"human_readable"`,`"yaml"`,`"xml"` | `"human_readable"` | The output format of the resource definition,  yml is the same as yaml |
-  
+| --help    | -h        |                                              | false              | show help of the function.                                             |
+
 **Example:**
 
 ```bash
@@ -184,12 +186,14 @@ Get details about the instance.
 | Name     | Shorthand | Values                                       | Default            | Description                                                            |
 | -------- | --------- | -------------------------------------------- | ------------------ | ---------------------------------------------------------------------- |
 | --format |           | `"json"`,`"human_readable"`,`"yaml"`,`"xml"` | `"human_readable"` | The output format of the resource definition,  yml is the same as yaml |
+| --help   | -h        |                                              | false              | show help of the function.                                             |
 
 **Example:**
 
 ```bash
 kudoctl get instance id9878
 ```
+
 </details>
   
 ---
@@ -201,6 +205,12 @@ Delete a resource definition and all the instances of this resource. On success 
 **Arguments** :
 
 `id` : the id of the resource
+
+**Flags :**  
+
+| Name   | Shorthand | Values | Default | Description                |
+| ------ | --------- | ------ | ------- | -------------------------- |
+| --help | -h        |        | false   | show help of the function. |
 
 **Example:**
 
@@ -247,6 +257,7 @@ Create a resource definition. By default if a resource with the same name exists
 | --file      | -f        | Path   | `""`    | add resource definition from file.              |
 | --no-update |           | bool   | false   | If the resource already exists, don’t update it |
 | --name      |           | string | `""`    | set the name of the resource                    |
+| --help      | -h        |        | false   | show help of the function.                      |
 
 **Kind specific flags :**
 
@@ -280,17 +291,16 @@ This command takes the same arguments as `create <kind>` except the kind is defi
 
 **Flags :**
 
-| Name   | Shorthand | Values | Default      | Description   |
-| ------ | --------- | ------ | ------------ | ------------- |
-| --kind |           | string | `"workload"` | resource kind |
-  
+| Name   | Shorthand | Values | Default      | Description                |
+| ------ | --------- | ------ | ------------ | -------------------------- |
+| --kind |           | string | `"workload"` | resource kind              |
+| --help | -h        |        | false        | show help of the function. |
 
 **Example:**
 
 ```bash
 kudoctl apply -f workload.yml
 ```
-
 
 </details>
 
@@ -304,7 +314,12 @@ Instantiate and start a resource
 
 `resource-id` : the id of the resource
 
-**Example:**
+**Flags :**
+| Name   | Shorthand | Values | Default | Description                |
+| ------ | --------- | ------ | ------- | -------------------------- |
+| --help | -h        |        | false   | show help of the function. |
+
+**Example :**
 
 ```bash
 kudoctl instantiate id9809
