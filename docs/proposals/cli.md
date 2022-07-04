@@ -12,15 +12,18 @@ kudoctl is the official cli client implementation for kudo.
 
 **Instance :** A ressource that has been applied to the kudo nodes/cluster, example : an instance of a container workload is representing the container running with the arguments of the workload definition.
 
+## Configuration 
+
+CLI configuration information is available in [cli-configuration.md](cli-configuration.md)
+
 ## Global flags
 
-| Name              | Shorthand | Values                             | Default        | Description                                                                       |
-| ----------------- | --------- | ---------------------------------- | -------------- | --------------------------------------------------------------------------------- |
-| --Version         | -V        | bool                               | false          | output the version of the client with the format : `v.major.minor.patch` (semver) |
-| --help            | -h        | bool                               | false          | display the help text.                                                            |
-| --config          | -c        | path                               | ~/.kudo/config | specify the path to the config file.                                              |
-| --host            |           | string                             | `''`           | specify the ip of the control plane to connect to.                                |
-| --verbosity-level | -v        | `'debug'/'info'/'warning'/'error'` | 2              | Set the verbosity level of the execution, see **Log format** section              |
+| Name              | Shorthand | Values                             | Default | Description                                                                       |
+| ----------------- | --------- | ---------------------------------- | ------- | --------------------------------------------------------------------------------- |
+| --Version         | -V        | bool                               | false   | output the version of the client with the format : `v.major.minor.patch` (semver) |
+| --help            | -h        | bool                               | false   | display the help text.                                                            |
+| --host            |           | string                             | `''`    | specify the ip of the control plane to connect to.                                |
+| --verbosity-level | -v        | `'debug'/'info'/'warning'/'error'` | 2       | Set the verbosity level of the execution, see **Log format** section              |
 
 ## Exit codes
 
