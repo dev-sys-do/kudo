@@ -1,8 +1,8 @@
 mod config;
-mod config;
 use chrono::Utc;
 use clap::Parser;
-use log::{LevelFilter, LevelFilter};
+mod request;
+use log::LevelFilter;
 use reqwest;
 mod resource;
 use std::io::Write;
@@ -31,7 +31,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut global_config = config::read_config()?;
 
     if let Some(verbosity) = cli.verbosity {
-        global_config.set_verbosity_level_str(verbosity.as_deref().unwrap_or("debug"));
+        global_config.verbosity_level =
+            config::get_verbosity_level_from_string(verbosity.as_deref().unwrap_or("debug"));
     }
 
     env_logger::builder()

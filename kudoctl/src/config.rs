@@ -23,7 +23,7 @@ fn default_config_file_path() -> PathBuf {
 }
 
 // Returns the right LevelFilter for the given log level string.
-fn get_verbosity_level_from_string(verbosity_level_str: &str) -> LevelFilter {
+pub fn get_verbosity_level_from_string(verbosity_level_str: &str) -> LevelFilter {
     match verbosity_level_str {
         "off" => LevelFilter::Off,
         "error" => LevelFilter::Error,
@@ -84,7 +84,7 @@ fn read_config_file(path: &PathBuf) -> Result<ConfigFile, Box<dyn std::error::Er
 
 // Read the configuration from the config file and the environment variables.
 // The environment variables override the values in the config file.
-pub fn read_config(file: String) -> Result<Config, Box<dyn std::error::Error>> {
+pub fn read_config() -> Result<Config, Box<dyn std::error::Error>> {
     // Read the config file
 
     let file_path = env::var("KUDO_CONFIG")
