@@ -1,7 +1,7 @@
 mod config;
 use chrono::{DateTime, Local, Utc};
 use clap::{Parser, Subcommand};
-use log::{debug, error, info, warn, LevelFilter};
+use log::{debug, error, info, warn, Level, LevelFilter};
 use reqwest;
 use std::io::Write;
 
@@ -33,6 +33,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     env_logger::builder()
+        .format(move |buf, record| {
+            let utc = Utc::now();
+
+            match global_config.verbosity_level {
+                // Write the file path and more time details if we are in trace mode
+                LevelFilter::Trace => writeln!(
+                    buf,
+                    "{} - {}:{} [{}] {}",
+                    utc,
+                    record.file().unwrap_or(""),
+                    record.line().unwrap_or(0),
+                    record.level(),
+                    record.args()
+                ),
+                _ => writeln!(buf, "{} [{:5}] {}", utc.format("%F %T"), record.level(), record.args()),
+            }
+        })
         .filter_level(global_config.verbosity_level)
         .try_init()?;
 
@@ -41,6 +58,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let client = reqwest::Client::new();
-
+    
     Ok(())
 }
