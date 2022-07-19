@@ -1,7 +1,7 @@
 use std::{
     env,
     fs::{create_dir_all, File},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use log::LevelFilter;
@@ -15,8 +15,11 @@ fn default_log_level_str() -> String {
 fn default_controller_url() -> String {
     "http://localhost:8080".to_string()
 }
-fn default_config_file() -> String {
-    "~/.kudo/config.yaml".to_string()
+fn default_config_file() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or(Path::new(".").to_path_buf())
+        .join(".kudo")
+        .join("config.yaml")
 }
 
 // Returns the right LevelFilter for the given log level string.
@@ -40,7 +43,7 @@ pub struct ConfigFile {
 }
 
 pub struct Config {
-    pub config_file: String,
+    pub config_file: PathBuf,
     pub controller_url: String,
     pub verbosity_level: LevelFilter,
 }
@@ -56,8 +59,7 @@ impl Config {
 
 // Read the config file and return a Config object.
 // If the file does not exist, creates one with the default values.
-fn read_config_file(file: String) -> Result<ConfigFile, Box<dyn std::error::Error>> {
-    let path = Path::new(&file);
+fn read_config_file(path: &PathBuf) -> Result<ConfigFile, Box<dyn std::error::Error>> {
     if !path.exists() {
         let parent = path.parent();
 
@@ -86,8 +88,12 @@ fn read_config_file(file: String) -> Result<ConfigFile, Box<dyn std::error::Erro
 pub fn read_config() -> Result<Config, Box<dyn std::error::Error>> {
     // Read the config file
 
-    let file_path = env::var("KUDO_CONFIG").unwrap_or(default_config_file());
-    let config_file = read_config_file(file_path.to_owned())?;
+    let file_path = if let Ok(path) = env::var("KUDO_CONFIG") {
+        Path::new(&path).to_path_buf()
+    } else {
+        default_config_file()
+    };
+    let config_file = read_config_file(&file_path)?;
 
     // get the verbosity level
 
