@@ -74,7 +74,7 @@ fn read_config_file(file: String) -> Result<ConfigFile, Box<dyn std::error::Erro
 
 // Read the configuration from the config file and the environment variables.
 // The environment variables override the values in the config file.
-pub fn read_config(file: String) -> Result<Config, Box<dyn std::error::Error>> {
+pub fn read_config() -> Result<Config, Box<dyn std::error::Error>> {
     // Read the config file
 
     let file_path = env::var("KUDO_CONFIG").unwrap_or(default_config_file());
