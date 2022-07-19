@@ -1,7 +1,9 @@
 mod config;
+use chrono::{DateTime, Local, Utc};
 use clap::{Parser, Subcommand};
-use log::{trace, LevelFilter};
+use log::{debug, error, info, warn, LevelFilter};
 use reqwest;
+use std::io::Write;
 
 /// Official CLI implementation for the kudo project
 #[derive(Parser)]
@@ -24,28 +26,21 @@ struct Cli {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
-    let mut global_config = config::read_config();
+    let mut global_config = config::read_config()?;
 
     if let Some(verbosity) = cli.verbosity {
-        // TODO: Alter the configuration when implemented
-        println!(
-            "Using verbosity : {}",
-            verbosity.unwrap_or_else(|| "debug".to_string())
-        );
+        global_config.set_verbosity_level(verbosity.as_deref().unwrap_or("debug"));
     }
+
+    env_logger::builder()
+        .filter_level(global_config.verbosity_level)
+        .try_init()?;
 
     if let Some(host) = cli.host.as_deref() {
-        // TODO: Alter the configuration when implemented
-        println!("Using host : {}", host);
+        global_config.set_controller_url(host);
     }
-
-    let level = LevelFilter::Trace;
-
-    env_logger::builder().filter_level(level);
-    trace!("Logger initialized");
 
     let client = reqwest::Client::new();
 
-    trace!("reqwest Client initialized");
     Ok(())
 }

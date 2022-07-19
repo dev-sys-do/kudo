@@ -20,7 +20,7 @@ fn default_config_file() -> String {
 }
 
 // Returns the right LevelFilter for the given log level string.
-fn get_verbosity_level_from_string(verbosity_level_str: &str) -> LevelFilter {
+pub fn get_verbosity_level_from_string(verbosity_level_str: &str) -> LevelFilter {
     match verbosity_level_str {
         "off" => LevelFilter::Off,
         "error" => LevelFilter::Error,
@@ -40,9 +40,18 @@ pub struct ConfigFile {
 }
 
 pub struct Config {
-    config_file: String,
-    controller_url: String,
-    verbosity_level: LevelFilter,
+    pub config_file: String,
+    pub controller_url: String,
+    pub verbosity_level: LevelFilter,
+}
+
+impl Config {
+    pub fn set_verbosity_level(&mut self, verbosity_level_str: &str) {
+        self.verbosity_level = get_verbosity_level_from_string(verbosity_level_str);
+    }
+    pub fn set_controller_url(&mut self, controller_url: &str) {
+        self.controller_url = controller_url.to_string();
+    }
 }
 
 // Read the config file and return a Config object.
