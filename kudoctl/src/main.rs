@@ -1,5 +1,6 @@
 use log::trace;
 use reqwest;
+mod resource;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
