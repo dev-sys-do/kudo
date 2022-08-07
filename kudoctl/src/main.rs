@@ -1,10 +1,13 @@
-use log::trace;
+mod config;
+use log::{trace, LevelFilter};
 use reqwest;
 mod resource;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
+    let level = LevelFilter::Trace;
+
+    env_logger::builder().filter_level(level);
     trace!("Logger initialized");
 
     let client = reqwest::Client::new();
