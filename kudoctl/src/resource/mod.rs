@@ -1,4 +1,5 @@
 pub mod workload;
+pub mod parse;
 
 use serde::{Deserialize, Serialize};
 
