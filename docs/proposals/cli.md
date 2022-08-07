@@ -8,9 +8,9 @@ kudoctl is the official cli client implementation for kudo.
 
 **Workload :** A definition of a task (executable/virtual machine/container) to execute.
 
-**Ressource :** A definition of a user or a workload, something that can be defined and sent to the kudo controller.
+**Resource :** A definition of a user or a workload, something that can be defined and sent to the kudo controller.
 
-**Instance :** A ressource that has been applied to the kudo nodes/cluster, example : an instance of a container workload is representing the container running with the arguments of the workload definition.
+**Instance :** A resource that has been applied to the kudo nodes/cluster, example : an instance of a container workload is representing the container running with the arguments of the workload definition.
 
 ## Configuration 
 
@@ -260,7 +260,7 @@ Create a resource definition and instanciate it. By default if a resource with t
 | --no-update |           | bool   | false        | If the resource already exists, don’t update it         |
 | --name      |           | string | `""`         | set the name of the resource                            |
 | --help      | -h        |        | false        | show help of the function.                              |
-| --kind      | -k        | string | `"workload"` | set the kind of the ressource to create and instanciate |
+| --kind      | -k        | string | `"workload"` | set the kind of the resource to create and instanciate |
 
 **Kind specific flags :**
 

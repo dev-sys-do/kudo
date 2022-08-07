@@ -8,7 +8,7 @@ Example :
     "type": "container",
     "name": "test-workload",
     "uri": "nginx",
-    "ressources": {
+    "resources": {
         "cpu": 1.0,
         "ram": 2048,
         "disk": 2,
@@ -43,25 +43,25 @@ Name of the workload, should be unique in the controller’s database.
 
 The name/uri of the container image , or an URI to the vm image or binary executable.
 
-## ressources
+## resources
 
 **type :** object/struct
 
-Definition of the maximum (container, binary) or allocated (vm) ressources.
+Definition of the maximum (container, binary) or allocated (vm) resources.
 
-### ressources.cpu
+### resources.cpu
 
 **type :** integer
 
 CPU usage, in number of milliCPU allocated.
 
-### ressources.ram
+### resources.ram
 
 **type :** integer
 
 Memory amount, unit is MB.
 
-### ressources.disk
+### resources.disk
 
 **type :** integer
 
