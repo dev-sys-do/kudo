@@ -1,70 +1,102 @@
-use crate::workload_manager::workload_listener::workload_listener::{
-    WorkloadListener
-};
-use crate::workload_manager::workload_listener::error::{
-    WorkloadListenerError
-};
-use futures::stream::Stream;
+use crate::workload_manager::workload_listener;
+use futures::executor::{ block_on, block_on_stream };
 use bollard::Docker;
-use bollard::container::{CreateContainerOptions, Config};
-use std::default::Default;
+use bollard::container::StatsOptions;
+use bollard::errors::Error;
+use bollard::models::{ ContainerStateStatusEnum, HealthStatusEnum };
+use tonic::Status;
+use proto::agent::{
+    Instance,
+    ResourceSummary,
+    Resource,
+    InstanceStatus,
+    Status as WorkloadStatus
+};
+use std::sync::mpsc::Sender;
+use std::thread;
 
+#[derive(Clone)]
 pub struct ContainerListener {
-    id: String,
-    container_id: String
+ //   container_id: String, 
+    //sender: Sender<InstanceStatus>,
 }
+
 
 impl ContainerListener {
-    pub async fn new(id: &str, container_id: &str, docker: Docker) -> Result<Self, WorkloadListenerError>{
-        let response = docker.inspect_container(id, None).await;
-        match response {
-            Ok(_) => Ok(ContainerListener { id: id.to_string(), container_id: container_id.to_string() }),
-            Err(_e) => Err(WorkloadListenerError::new("Failed to create listener: container does not exist"))
-        }
+
+    pub fn new(container_id: String, instance: Instance, sender: Sender<InstanceStatus>) -> Result<Self, ()> { 
+            
+        thread::spawn(move || {
+            #[cfg(unix)]
+            let docker = Docker::connect_with_socket_defaults().unwrap();
+
+            loop {
+                let new_instance_status = Self::fetch_instance_status(container_id.as_str(), &instance, &docker);
+
+                match new_instance_status {
+                    Ok(instance_to_send) => sender.send(instance_to_send).unwrap(),
+                    Err(_e) => break,
+                };
+            }
+            
+        });
+
+        Ok(Self{})
+
     }
 
-    pub fn getContainerId(&self) -> &str {
-        self.container_id.as_str()
+
+    /**
+     * Get instance data via inspect_container() and stats() then returns an InstanceStatus
+     */
+    pub fn fetch_instance_status(container_id: &str, instance: &Instance, docker_connection: &Docker) -> Result<InstanceStatus, Error> {
+        let stats_options = Some(StatsOptions{
+            stream: false,
+            one_shot: true,
+        });
+
+        let container_data = block_on(docker_connection.inspect_container(container_id, None))?;
+        let container_resources = block_on_stream(docker_connection.stats(container_id, stats_options)).next().unwrap()?;
+        let container_health = container_data.clone().state.unwrap().health.unwrap().status.unwrap();
+        let container_status = container_data.state.unwrap().status.unwrap();
+
+        // WorkloadStatus::Failed occurs when the container hasn't even started
+        let mut workload_status = match container_status {
+            //ContainerStateStatusEnum::CREATED => ,
+            ContainerStateStatusEnum::RUNNING => WorkloadStatus::Running,
+            //ContainerStateStatusEnum::PAUSED => ,
+            //ContainerStateStatusEnum::RESTARTING => ,
+            //ContainerStateStatusEnum::EMPTY => ,
+            ContainerStateStatusEnum::REMOVING => WorkloadStatus::Destroying,
+            ContainerStateStatusEnum::EXITED => WorkloadStatus::Terminated,
+            ContainerStateStatusEnum::DEAD => WorkloadStatus::Crashed,
+            _ => WorkloadStatus::Scheduled
+        };
+
+        workload_status = match container_health {
+            HealthStatusEnum::STARTING => WorkloadStatus::Starting,
+            _ => workload_status
+        };
+
+        Ok(InstanceStatus {
+            id: instance.clone().id,
+            status: workload_status as i32,
+            description: "heres a description".to_string() ,
+            resource: Some(Resource {
+                limit: Some(ResourceSummary { 
+                    cpu: instance.clone().resource.unwrap().limit.unwrap().cpu,
+                    memory: instance.clone().resource.unwrap().limit.unwrap().memory,
+                    disk: instance.clone().resource.unwrap().limit.unwrap().disk
+                }),
+                usage: Some(ResourceSummary { //check if these are good units
+                    cpu: container_resources.cpu_stats.cpu_usage.usage_in_usermode as i32, 
+                    memory: container_resources.memory_stats.usage.unwrap() as i32, 
+                    disk: container_resources.storage_stats.read_count_normalized.unwrap() as i32
+                }),
+            }), 
+        })
     }
 
-    pub fn getId(&self) -> &str {
-        self.id.as_str()
-    }
 }
 
-impl WorkloadListener for ContainerListener {
-    fn getStream(&self) -> Box<dyn Stream<Item = String>>{
-        panic!()
-    }
-}
-
-#[tokio::test]
-async fn it_works() -> Result<(), WorkloadListenerError>{
-    #[cfg(unix)]
-    let docker = Docker::connect_with_socket_defaults().unwrap();
-
-    let opt = Some(CreateContainerOptions {
-        name: "debian",
-    });
-
-    let cfg = Config {
-        image: Some("debian"),
-        cmd: Some(vec!["tee"]),
-        tty: Some(true),
-        attach_stdin: Some(false),
-        attach_stdout: Some(false),
-        attach_stderr: Some(false),
-        open_stdin: Some(false),
-        ..Default::default()
-    };
-
-    let container = docker.create_container::<&str, &str>(opt, cfg).await.unwrap();
-    docker.start_container::<String>("debian", None).await.unwrap();
-
-    let listener_stream = ContainerListener::new("debian", "debian", docker).await?;
-
-    assert_eq!(listener_stream.getId(), "debian");
-    //TODO: check if stream is open
-
-    Ok(())
-}
+impl workload_listener::workload_listener::WorkloadListener for ContainerListener {}
