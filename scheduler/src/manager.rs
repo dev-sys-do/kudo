@@ -1,5 +1,6 @@
-use log::info;
 use proto::scheduler::Instance;
+use log::{info, debug};
+use tokio::task::JoinHandle;
 
 use crate::{storage::Storage, Node};
 
@@ -40,7 +41,14 @@ impl Manager {
         &self.nodes
     }
 
-    pub fn run(&self) {
+    /// This function runs the scheduler.
+    /// 
+    /// Returns:
+    /// 
+    /// A vector of JoinHandles.
+    pub fn run(&self) -> Result<Vec<JoinHandle<()>>, Box<dyn std::error::Error>> {
+        let mut handlers = vec![];
         info!("scheduler running and ready to receive incoming requests ...");
+        Ok(handlers)
     }
 }
