@@ -83,13 +83,19 @@ impl Manager {
     /// Returns:
     ///
     /// A vector of JoinHandles.
-    pub fn run(&self) -> Result<Vec<JoinHandle<()>>, Box<dyn std::error::Error>> {
+    pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
         let mut handlers = vec![];
 
         // create listeners and serve the grpc server
         handlers.push(self.create_grpc_server());
 
         info!("scheduler running and ready to receive incoming requests ...");
-        Ok(handlers)
+
+        // wait the end of all the threads
+        for handler in handlers {
+            handler.await?;
+        }
+
+        Ok(())
     }
 }
