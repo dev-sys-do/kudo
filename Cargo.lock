@@ -1471,6 +1471,9 @@ dependencies = [
  "env_logger 0.8.4",
  "log",
  "proto",
+ "tokio",
+ "tokio-stream",
+ "tonic",
 ]
 
 [[package]]
