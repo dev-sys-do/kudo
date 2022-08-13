@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 proto = { path = "../proto" }
+log = "0.4.0"
+env_logger = "0.8.4"
