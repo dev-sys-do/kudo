@@ -10,13 +10,13 @@ enum Status {
   STOPPING = 2;
   DESTROYING = 3;
   TERMINATED = 4;
-  CRASHED = 5; commits 
+  CRASHED = 5;
   FAILED = 6;
   SCHEDULING = 7;
   SCHEDULED = 8;
 }
 
-// Represents the different Type of a workflow
+// Represents the different types of a workflow
 enum Type {
   CONTAINER = 0;
 }
