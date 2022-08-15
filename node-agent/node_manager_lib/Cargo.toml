@@ -1,5 +1,5 @@
 [package]
-name = "node-manager-lib"
+name = "node_manager_lib"
 version = "0.1.0"
 edition = "2021"
 
