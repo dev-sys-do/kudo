@@ -1,9 +1,14 @@
 use log::{debug, info};
-use proto::scheduler::{node_service_server::NodeServiceServer, Instance};
+use proto::scheduler::{
+    instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
+    Instance,
+};
 use tokio::task::JoinHandle;
 use tonic::transport::Server;
 
-use crate::{storage::Storage, Node, node_listener::NodeListener};
+use crate::{
+    instance_listener::InstanceListener, node_listener::NodeListener, storage::Storage, Node,
+};
 
 #[derive(Debug)]
 pub struct Manager {
@@ -55,11 +60,18 @@ impl Manager {
         let node_listener = NodeListener::default();
         debug!("create node listener with data : {:?}", node_listener);
 
+        let instance_listener = InstanceListener::default();
+        debug!(
+            "create instance listener with data : {:?}",
+            instance_listener
+        );
+
         tokio::spawn(async move {
             info!("started grpc server at {}", addr);
-  
+
             Server::builder()
                 .add_service(NodeServiceServer::new(node_listener))
+                .add_service(InstanceServiceServer::new(instance_listener))
                 .serve(addr)
                 .await
                 .unwrap();
