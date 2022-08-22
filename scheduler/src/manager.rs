@@ -3,7 +3,7 @@ use proto::scheduler::{node_service_server::NodeServiceServer, Instance};
 use tokio::task::JoinHandle;
 use tonic::transport::Server;
 
-use crate::{storage::Storage, Node};
+use crate::{storage::Storage, Node, node_listener::NodeListener};
 
 #[derive(Debug)]
 pub struct Manager {
@@ -52,11 +52,17 @@ impl Manager {
         info!("creating grpc server ...");
 
         let addr = "127.0.0.1:50051".parse().unwrap();
+        let node_listener = NodeListener::default();
+        debug!("create node listener with data : {:?}", node_listener);
 
         tokio::spawn(async move {
             info!("started grpc server at {}", addr);
-
-            Server::builder().serve(addr).await.unwrap();
+  
+            Server::builder()
+                .add_service(NodeServiceServer::new(node_listener))
+                .serve(addr)
+                .await
+                .unwrap();
         })
     }
 
