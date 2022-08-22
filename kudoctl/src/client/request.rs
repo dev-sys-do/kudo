@@ -1,11 +1,9 @@
 use crate::config::Config;
 use reqwest::header;
-use reqwest::Body;
 use reqwest::Response;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
-use std::error::Error;
 
 // Represent the error returned by the controller when a request fails
 #[derive(Deserialize)]
@@ -35,7 +33,7 @@ pub struct Client {
 
 impl Client {
     // Create a new client with the given config.
-    pub fn new(config: &Config) -> Result<Client, Box<dyn std::error::Error>> {
+    pub fn new(config: &Config) -> anyhow::Result<Client> {
         let base_url = reqwest::Url::parse(&config.controller_url)?;
 
         let mut headers = header::HeaderMap::new();
@@ -62,7 +60,7 @@ impl Client {
         endpoint: &str,
         method: reqwest::Method,
         body: Option<&U>,
-    ) -> Result<Response, Box<dyn Error>> {
+    ) -> anyhow::Result<Response> {
         let url = self.base_url.join(endpoint)?;
         let mut request = (*self).client.request(method, url);
 
@@ -70,10 +68,7 @@ impl Client {
             request = request.json(body);
         }
 
-        request
-            .send()
-            .await
-            .map_err(|e| Box::new(e) as Box<dyn Error>)
+        request.send().await.map_err(|e| anyhow::Error::from(e))
     }
 
     // Send a request to the controller and deserialize the response.
@@ -84,7 +79,7 @@ impl Client {
         endpoint: &str,
         method: reqwest::Method,
         body: Option<&U>,
-    ) -> Result<T, Box<dyn Error>> {
+    ) -> anyhow::Result<T> {
         let response = self.send_request(endpoint, method, body).await?;
 
         // Check if the response is an error.
@@ -94,7 +89,7 @@ impl Client {
             // Read the error message from the response body.
 
             let error_response: ErrorResponse = response.json().await?;
-            return Err(Box::new(RequestError {
+            return Err(anyhow::Error::from(RequestError {
                 error: error_response.error,
                 status,
             }));
@@ -103,6 +98,6 @@ impl Client {
         response
             .json::<T>()
             .await
-            .map_err(|e| Box::new(e) as Box<dyn Error>)
+            .map_err(|e| anyhow::Error::from(e))
     }
 }

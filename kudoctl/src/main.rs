@@ -1,11 +1,11 @@
 mod config;
 use chrono::Utc;
 use clap::Parser;
-mod request;
+mod client;
 use log::LevelFilter;
-use reqwest;
 mod resource;
 use std::io::Write;
+mod subcommands;
 
 /// Official CLI implementation for the kudo project
 #[derive(Parser)]
@@ -22,6 +22,10 @@ struct Cli {
     /// This has priority over the config file and enviorment variable.
     #[clap(short, long)]
     host: Option<String>,
+
+    /// Execute a command on the connected cluster
+    #[clap(subcommand)]
+    command: subcommands::Subcommands,
 }
 
 #[tokio::main]
@@ -66,7 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         global_config.controller_url = host.to_string();
     }
 
-    let client = reqwest::Client::new();
+    subcommands::match_subcommand(cli.command, &global_config).await;
 
     Ok(())
 }
