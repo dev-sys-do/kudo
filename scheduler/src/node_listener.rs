@@ -1,9 +1,24 @@
 use log::debug;
-use proto::scheduler::{node_service_server::NodeService, NodeRegisterRequest, NodeStatus, NodeUnregisterRequest, NodeUnregisterResponse, NodeRegisterResponse};
-use tonic::{Request, Status, Response, Streaming};
+use proto::scheduler::{
+    node_service_server::NodeService, NodeRegisterRequest, NodeRegisterResponse, NodeStatus,
+    NodeUnregisterRequest, NodeUnregisterResponse,
+};
+use tokio::sync::mpsc;
+use tonic::{Request, Response, Status, Streaming};
 
-#[derive(Default, Debug)]
-pub struct NodeListener {}
+use crate::{manager::Manager, Event};
+
+#[derive(Debug)]
+#[allow(dead_code)]
+pub struct NodeListener {
+    sender: mpsc::Sender<Event>,
+}
+
+impl NodeListener {
+    pub fn new(sender: mpsc::Sender<Event>) -> Self {
+        NodeListener { sender }
+    }
+}
 
 #[tonic::async_trait]
 impl NodeService for NodeListener {
@@ -11,8 +26,36 @@ impl NodeService for NodeListener {
         &self,
         request: Request<Streaming<NodeStatus>>,
     ) -> Result<Response<()>, Status> {
-        debug!("{:?}", request);
-        Ok(Response::new(()))
+        let mut stream = request.into_inner();
+        let (tx, mut rx) = Manager::create_mpsc_channel();
+
+        loop {
+            let message = stream.message().await?;
+            match message {
+                Some(node_status) => {
+                    debug!("Node status: {:?}", node_status);
+                    self.sender
+                        .send(Event::NodeStatus(node_status, tx.clone()))
+                        .await
+                        .unwrap();
+
+                    if let Some(res) = rx.recv().await {
+                        match res {
+                            Ok(()) => {
+                                debug!("Node status updated successfully");
+                            }
+                            Err(err) => {
+                                debug!("Error updating node status: {:?}", err);
+                                return Err(err);
+                            }
+                        }
+                    }
+                }
+                None => {
+                    return Ok(Response::new(()));
+                }
+            }
+        }
     }
 
     async fn register(
@@ -20,7 +63,20 @@ impl NodeService for NodeListener {
         request: Request<NodeRegisterRequest>,
     ) -> Result<Response<NodeRegisterResponse>, Status> {
         debug!("{:?}", request);
-        Ok(Response::new(NodeRegisterResponse::default()))
+        let (tx, rx) = Manager::create_oneshot_channel();
+
+        match self
+            .sender
+            .send(Event::NodeRegister(request.into_inner(), tx))
+            .await
+        {
+            Ok(_) => {
+                return rx.await.unwrap();
+            }
+            Err(_) => {
+                return Err(Status::internal("could not send event to manager"));
+            }
+        }
     }
 
     async fn unregister(
@@ -28,6 +84,19 @@ impl NodeService for NodeListener {
         request: Request<NodeUnregisterRequest>,
     ) -> Result<Response<NodeUnregisterResponse>, Status> {
         debug!("{:?}", request);
-        Ok(Response::new(NodeUnregisterResponse::default()))
+        let (tx, rx) = Manager::create_oneshot_channel();
+
+        match self
+            .sender
+            .send(Event::NodeUnregister(request.into_inner(), tx))
+            .await
+        {
+            Ok(_) => {
+                return rx.await.unwrap();
+            }
+            Err(_) => {
+                return Err(Status::internal("could not send event to manager"));
+            }
+        }
     }
 }
