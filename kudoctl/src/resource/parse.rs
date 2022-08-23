@@ -1,6 +1,7 @@
 use super::Resource;
 
-pub fn parseYAMLResource(content: &str) -> Result<Resource, serde_yaml::Error> {
+#[allow(dead_code)]
+pub fn parse_yaml_resource(content: &str) -> Result<Resource, serde_yaml::Error> {
     let resource: Resource = serde_yaml::from_str(content)?;
     Ok(resource)
 }
@@ -21,7 +22,7 @@ resources:
   memory: 2
   disk: 3
 "#;
-        let resource = parseYAMLResource(content).unwrap();
+        let resource = parse_yaml_resource(content).unwrap();
 
         match resource {
             Resource::Workload(workload) => {
@@ -49,7 +50,7 @@ ports:
   - "8080:8080"
   - "8081:8081"
 "#;
-        let resource = parseYAMLResource(content).unwrap();
+        let resource = parse_yaml_resource(content).unwrap();
 
         match resource {
             Resource::Workload(workload) => {
@@ -75,7 +76,7 @@ env:
     - "KEY1=VALUE1"
     - "KEY2=VALUE2"
 "#;
-        let resource = parseYAMLResource(content).unwrap();
+        let resource = parse_yaml_resource(content).unwrap();
 
         match resource {
             Resource::Workload(workload) => {
@@ -97,7 +98,7 @@ resources:
     memory: 2
     disk: 3
 "#;
-        let resource = parseYAMLResource(content);
+        let resource = parse_yaml_resource(content);
         assert!(resource.is_err());
     }
 }

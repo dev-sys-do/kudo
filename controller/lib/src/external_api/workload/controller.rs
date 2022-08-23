@@ -12,13 +12,13 @@ pub fn get_services() -> Scope {
 
 #[get("/")]
 pub async fn get_workloads() -> impl Responder {
-    service::get_workloads(&vec!["1".to_string(), "2".to_string(), "3".to_string()]);
+    service::get_workloads(&["1".to_string(), "2".to_string(), "3".to_string()]);
     HttpResponse::Ok().body("workload")
 }
 
 #[get("/{workload_id}")]
 pub async fn get_workload(workload_id: web::Path<String>) -> impl Responder {
-    service::get_workloads(&vec![workload_id.to_string()]);
+    service::get_workloads(&[workload_id.to_string()]);
     HttpResponse::Ok().body(format!("workload {}", workload_id))
 }
 
@@ -35,12 +35,12 @@ pub async fn patch_workload(
     body: web::Json<WorkloadInfo>,
 ) -> impl Responder {
     let workload_info = body.into_inner();
-    service::update_workload(&workload_id.to_string(), &workload_info);
+    service::update_workload(&workload_id, &workload_info);
     HttpResponse::Ok().body(format!("patch_workload {}", workload_id))
 }
 
 #[delete("/{workload_id}")]
 pub async fn delete_workload(workload_id: web::Path<String>) -> impl Responder {
-    service::delete_workload(&workload_id.to_string());
+    service::delete_workload(&workload_id);
     HttpResponse::Ok().body(format!("delete_workload {}", workload_id))
 }

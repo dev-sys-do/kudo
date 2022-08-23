@@ -68,7 +68,7 @@ impl Client {
             request = request.json(body);
         }
 
-        request.send().await.map_err(|e| anyhow::Error::from(e))
+        request.send().await.map_err(anyhow::Error::from)
     }
 
     // Send a request to the controller and deserialize the response.
@@ -95,9 +95,6 @@ impl Client {
             }));
         }
 
-        response
-            .json::<T>()
-            .await
-            .map_err(|e| anyhow::Error::from(e))
+        response.json::<T>().await.map_err(anyhow::Error::from)
     }
 }

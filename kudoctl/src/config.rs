@@ -54,6 +54,7 @@ impl Default for ConfigFile {
 
 // This struct contains the configuration for the application.
 pub struct Config {
+    #[allow(dead_code)]
     config_file: PathBuf,
     pub controller_url: String,
     pub verbosity_level: LevelFilter,
@@ -88,7 +89,7 @@ pub fn read_config() -> Result<Config, Box<dyn std::error::Error>> {
     // Read the config file
 
     let file_path = env::var("KUDO_CONFIG")
-        .and_then(|path| Ok(Path::new(&path).to_path_buf()))
+        .map(|path| Path::new(&path).to_path_buf())
         .unwrap_or_else(|_| default_config_file_path());
 
     let config_file = read_config_file(&file_path)?;
