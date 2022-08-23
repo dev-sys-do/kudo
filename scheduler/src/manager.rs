@@ -19,6 +19,12 @@ pub struct Manager {
     nodes: Arc<Storage<Node>>,
 }
 
+impl Default for Manager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Manager {
     /// `new` creates a new `Manager` struct with two empty `Storage` structs
     ///
@@ -26,12 +32,9 @@ impl Manager {
     ///
     /// A new Manager struct
     pub fn new() -> Self {
-        let instances = Arc::new(Storage::new());
-        let nodes = Arc::new(Storage::new());
-
         Manager {
-            instances: instances,
-            nodes: nodes,
+            instances: Arc::new(Storage::new()),
+            nodes: Arc::new(Storage::new()),
         }
     }
 
