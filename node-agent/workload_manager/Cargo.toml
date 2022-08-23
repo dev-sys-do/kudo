@@ -11,3 +11,6 @@ tonic = "0.7"
 bollard = "0.13"
 futures-util = "0.3"
 anyhow = "1.0"
+
+[dev-dependencies]
+tokio-test = "*"
