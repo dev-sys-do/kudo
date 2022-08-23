@@ -18,6 +18,7 @@ pub enum OrchestratorError {
     NodeNotFound,
     InstanceNotFound,
     NetworkError(String),
+    NotEnoughResources,
 }
 
 #[derive(Debug)]
@@ -139,11 +140,27 @@ impl Orchestrator {
             .get(&id.clone())
             .ok_or(OrchestratorError::NodeNotFound)?;
 
-        self.nodes.update(&id.clone(), Node { id: status.id });
+        self.nodes.update(
+            &id.clone(),
+            Node {
+                id: status.id,
+                status: Status::Running,
+                resource: status.resource,
+            },
+        );
         Ok(())
     }
 
-    pub fn find_best_node(&self, instance: &Instance) -> Result<(), OrchestratorError> {
+    /// Find the best node for the given instance
+    ///
+    /// Arguments:
+    ///
+    /// * `instance`: The instance that we want to find a node for.
+    ///
+    /// Returns:
+    ///
+    /// A Result<NodeIdentifier, OrchestratorError>
+    pub fn find_best_node(&self, instance: &Instance) -> Result<NodeIdentifier, OrchestratorError> {
         debug!("Finding best node for instance: {:?}", instance);
 
         let nodes = self.nodes.get_all();
@@ -154,15 +171,80 @@ impl Orchestrator {
         }
 
         for (_, node) in nodes {
-            info!("{:?}", node);
+            let has_enough_resources = match Self::has_enough_resources(
+                node.resource.clone().unwrap(),
+                instance.resource.clone().unwrap(),
+            ) {
+                Ok(_) => true,
+                Err(_) => continue,
+            };
+
+            if has_enough_resources {
+                info!("Instance will be scheduled on node: {:?}", node.id.clone());
+                return Ok(node.id.clone());
+            }
         }
 
-        Ok(())
+        Err(OrchestratorError::NotEnoughResources)
+    }
+
+    /// It takes a `Resource` struct, and returns a `ResourceSummary` struct
+    ///
+    /// Arguments:
+    ///
+    /// * `resource`: Resource - The resource object that we're going to compute the available resources
+    /// for.
+    ///
+    /// Returns:
+    ///
+    /// A Result<ResourceSummary, OrchestratorError>
+    fn compute_available_resources(
+        resource: Resource,
+    ) -> Result<ResourceSummary, OrchestratorError> {
+        let available_limit = resource
+            .limit
+            .ok_or(OrchestratorError::NotEnoughResources)?;
+
+        let available_usage = resource
+            .usage
+            .ok_or(OrchestratorError::NotEnoughResources)?;
+
+        Ok(ResourceSummary {
+            cpu: available_limit.cpu - available_usage.cpu,
+            memory: available_limit.memory - available_usage.memory,
+            disk: available_limit.disk - available_usage.disk,
+        })
+    }
+
+    /// "If the needed resources are not defined, return an error. Otherwise, return true if the
+    /// available resources are greater than or equal to the needed resources."
+    ///
+    /// The function is a bit more complicated than that, but that's the gist of it
+    ///
+    /// Arguments:
+    ///
+    /// * `available`: Resource - The available resources on the node
+    /// * `needed`: The resources that the user wants to use
+    ///
+    /// Returns:
+    ///
+    /// A boolean value.
+    fn has_enough_resources(
+        available: Resource,
+        needed: Resource,
+    ) -> Result<bool, OrchestratorError> {
+        let available_resources = Self::compute_available_resources(available)?;
+        let needed_resources = needed.limit.ok_or(OrchestratorError::NotEnoughResources)?;
+
+        Ok(available_resources.cpu >= needed_resources.cpu
+            && available_resources.memory >= needed_resources.memory
+            && available_resources.disk >= needed_resources.disk)
     }
 }
 
 struct Transformer {}
 
+#[allow(dead_code)]
 impl Transformer {
     pub fn scheduler_instance_to_agent_instance(instance: Instance) -> agent::Instance {
         agent::Instance {

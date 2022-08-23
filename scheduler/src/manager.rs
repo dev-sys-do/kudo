@@ -198,7 +198,11 @@ impl Manager {
                         // todo: parse certificate and get the node information
                         let node = Node {
                             id: Uuid::new_v4().to_string(),
+                            status: Status::Starting,
+                            resource: None,
                         };
+
+                        debug!("registered node : {:?}", node);
 
                         match orchestrator.lock().await.register_node(node) {
                             Ok(_) => {

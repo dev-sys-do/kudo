@@ -1,6 +1,6 @@
 use proto::scheduler::{
     Instance, InstanceStatus, NodeRegisterRequest, NodeRegisterResponse, NodeStatus,
-    NodeUnregisterRequest, NodeUnregisterResponse,
+    NodeUnregisterRequest, NodeUnregisterResponse, Resource, Status,
 };
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
@@ -31,6 +31,8 @@ pub enum SchedulerError {
 #[allow(dead_code)]
 pub struct Node {
     id: String,
+    status: Status,
+    resource: Option<Resource>,
 }
 
 pub type NodeIdentifier = String;
