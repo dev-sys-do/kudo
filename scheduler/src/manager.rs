@@ -180,6 +180,24 @@ impl Manager {
                                 tx.send(Ok(tonic::Response::new(response))).unwrap();
                             }
                         };
+                    },
+                    Event::NodeStatus(status, tx) => {
+                        info!("received node status event : {:?}", status);
+
+                        match orchestrator.lock().await.update_node_status(status.id.clone(), status) {
+                            Ok(_) => {
+                                info!("successfully updated node status");
+                                tx.send(Ok(())).await.unwrap();
+                            },
+                            Err(err) => {
+                                info!("error while updating node status : {:?}", err);
+                                tx.send(Err(
+                                    tonic::Status::internal(
+                                        format!("Error thrown by the orchestrator: {:?}", err)
+                                    )
+                                )).await.unwrap();
+                            },
+                        };
                     }
                 }
             }

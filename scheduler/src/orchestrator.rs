@@ -1,5 +1,5 @@
 use log::{info, debug};
-use proto::scheduler::Instance;
+use proto::scheduler::{Instance, NodeStatus};
 
 use crate::{storage::{Storage, IStorage}, Node, NodeIdentifier};
 
@@ -34,6 +34,16 @@ impl Orchestrator {
         self.nodes.get(&id.clone()).ok_or(OrchestratorError::NodeNotFound)?;
 
         self.nodes.delete(&id.clone());
+        Ok(())
+    }
+
+    pub fn update_node_status(&mut self, id: NodeIdentifier, status: NodeStatus) -> Result<(), OrchestratorError> {
+        // Return an error if the node is not found.
+        self.nodes.get(&id.clone()).ok_or(OrchestratorError::NodeNotFound)?;
+
+        self.nodes.update(&id.clone(), Node {
+            id: status.id
+        });
         Ok(())
     }
 
