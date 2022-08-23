@@ -50,7 +50,16 @@ pub async fn execute(args: Apply, conf: &config::Config) -> Result<String> {
         serde_yaml::from_str(&yaml).context("Error parsing file resource")?;
 
     if args.no_update {
-        // TODO: check if the workload already exists
+        //  check if the workload already exists
+
+        match &resource_data {
+            Resource::Workload(workload) => {
+                if let Ok(workload) = client::workload::get(&client, &workload.name).await {
+                    info!("Workload {} already exists", workload.name);
+                    return Ok(String::new());
+                }
+            }
+        }
     }
 
     match resource_data {
