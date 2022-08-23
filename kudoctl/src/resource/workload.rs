@@ -12,7 +12,7 @@ pub struct Workload {
     pub env: Option<Vec<String>>,
 }
 
-// Resources assigned to a workload 
+// Resources assigned to a workload
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Resources {
     // CPU in milliCPU
@@ -22,4 +22,3 @@ pub struct Resources {
     // Storage in GB
     pub disk: u64,
 }
-
