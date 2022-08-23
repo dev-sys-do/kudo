@@ -12,6 +12,7 @@ pub mod manager;
 pub mod node_listener;
 pub mod storage;
 pub mod manager;
+pub mod node_listener;
 
 #[derive(Error, Debug)]
 pub enum SchedulerError {

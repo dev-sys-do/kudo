@@ -22,6 +22,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     manager.run().await?;
 
+    // wait the end of all the threads
+    for handler in handlers {
+        handler.await?;
+    }
+
     info!("shutting down");
     Ok(())
 }
