@@ -2,11 +2,12 @@ use super::workload;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use log::info;
+use std::net::SocketAddr;
 
 pub struct ExternalAPIInterface {}
 
 impl ExternalAPIInterface {
-    pub async fn new(address: String, num_workers: usize) -> Self {
+    pub async fn new(address: SocketAddr, num_workers: usize) -> Self {
         info!(
             "Starting {} HTTP worker(s) listening on {}",
             num_workers, address
