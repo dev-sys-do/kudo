@@ -20,7 +20,7 @@ pub struct Apply {
     no_update: bool,
 }
 
-pub async fn execute(args: Apply, conf: &config::Config) -> Result<()> {
+pub async fn execute(args: Apply, conf: &config::Config) -> Result<String> {
     let client = Client::new(conf).context("Error creating client")?;
 
     // read the yaml file if -f is used
@@ -67,5 +67,5 @@ pub async fn execute(args: Apply, conf: &config::Config) -> Result<()> {
             );
         }
     }
-    Ok(())
+    Ok("".to_string())
 }
