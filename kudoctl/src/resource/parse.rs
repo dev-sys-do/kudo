@@ -88,7 +88,7 @@ env:
     }
 
     #[test]
-    fn test_parse_incomplete_yaml_resource(){
+    fn test_parse_incomplete_yaml_resource() {
         let content = r#"
 kind: workload
 name: my-workload
