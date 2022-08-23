@@ -22,6 +22,21 @@ pub async fn create(client: &Client, workload: &workload::Workload) -> Result<St
     Ok(response.id)
 }
 
+/// Get info about a workload.
+///
+/// Returns the workload info.
+pub async fn get(client: &Client, workload_id: &str) -> Result<workload::Workload> {
+    let response: workload::Workload = (*client)
+        .send_json_request::<workload::Workload, ()>(
+            &format!("/workload/{}", workload_id),
+            Method::GET,
+            None,
+        )
+        .await
+        .context("Error getting workload")?;
+    Ok(response)
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetWorkloadResponse {
     pub count: u64,
