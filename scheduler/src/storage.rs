@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 /// Defining a trait called IStorage that takes a generic type T.
-trait IStorage<T> {
+pub trait IStorage<T> {
     fn get(&self, id: &str) -> Option<&T>;
     fn get_mut(&mut self, id: &str) -> Option<&mut T>;
     fn update(&mut self, id: &str, value: T);
