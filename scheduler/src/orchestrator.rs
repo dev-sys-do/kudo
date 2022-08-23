@@ -1,11 +1,12 @@
 use log::{info, debug};
 use proto::scheduler::Instance;
 
-use crate::{storage::{Storage, IStorage}, Node};
+use crate::{storage::{Storage, IStorage}, Node, NodeIdentifier};
 
 #[derive(Debug)]
 pub enum OrchestratorError {
     NoAvailableNodes,
+    NodeNotFound,
 }
 
 #[derive(Debug)]
@@ -25,6 +26,14 @@ impl Orchestrator {
 
     pub fn register_node(&mut self, node: Node) -> Result<(), OrchestratorError> {
         self.nodes.update(&node.id.clone(), node);
+        Ok(())
+    }
+
+    pub fn unregister_node(&mut self, id: NodeIdentifier) -> Result<(), OrchestratorError> {
+        // Return an error if the node is not found.
+        self.nodes.get(&id.clone()).ok_or(OrchestratorError::NodeNotFound)?;
+
+        self.nodes.delete(&id.clone());
         Ok(())
     }
 
