@@ -79,9 +79,9 @@ env:
 
         match resource {
             Resource::Workload(workload) => {
-                assert_eq!(workload.enviroment.as_ref().unwrap().len(), 2);
-                assert_eq!(workload.enviroment.as_ref().unwrap()[0], "KEY1=VALUE1");
-                assert_eq!(workload.enviroment.as_ref().unwrap()[1], "KEY2=VALUE2");
+                assert_eq!(workload.env.as_ref().unwrap().len(), 2);
+                assert_eq!(workload.env.as_ref().unwrap()[0], "KEY1=VALUE1");
+                assert_eq!(workload.env.as_ref().unwrap()[1], "KEY2=VALUE2");
             }
             _ => panic!("Unexpected resource type"),
         }

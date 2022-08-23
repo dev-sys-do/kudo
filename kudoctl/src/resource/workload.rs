@@ -8,7 +8,8 @@ pub struct Workload {
     pub uri: String,
     pub resources: Resources,
     pub ports: Option<Vec<String>>,
-    pub enviroment: Option<Vec<String>>,
+    /// environment variables to set on the workload
+    pub env: Option<Vec<String>>,
 }
 
 // Resources assigned to a workload 
