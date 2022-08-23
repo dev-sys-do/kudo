@@ -9,3 +9,5 @@ edition = "2021"
 controller_lib = { path = "./lib" }
 tokio = { version = "1.20.0", features = ["macros"] }
 env_logger = "0.6.0"
+confy = "0.4.0"
+serde = { version = "1.0.139", features = ["derive"] }
