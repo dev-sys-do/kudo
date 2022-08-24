@@ -7,5 +7,5 @@ edition = "2021"
 
 [dependencies]
 proto = { path = "../proto" }
-workload_manager_lib = { path = "./workload_manager_lib" }
+workload_manager = { path = "./workload_manager" }
 tonic = "0.8"

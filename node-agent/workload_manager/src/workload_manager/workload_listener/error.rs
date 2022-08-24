@@ -20,6 +20,6 @@ impl fmt::Display for WorkloadListenerError {
 
 impl Error for WorkloadListenerError {
     fn description(&self) -> &str {
-        &self.details.as_str()
+        self.details.as_str()
     }
 }

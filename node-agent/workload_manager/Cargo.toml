@@ -6,3 +6,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+futures = "0.3"
+tonic = "0.7.2"
+bollard = "0.12"
+tokio = { version = "1", features = ["full"]}
+proto = { path = "../../proto" }
+sysinfo = "0.24.6"

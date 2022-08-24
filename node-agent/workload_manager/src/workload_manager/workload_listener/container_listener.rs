@@ -225,7 +225,7 @@ mod tests {
         docker.remove_container(container.id.as_str(), None).await.unwrap();
 
         assert_eq!(res.id, instance.id);
-        assert!(res.resource.unwrap().usage.unwrap().cpu <= i32::MAX);
+        assert!(res.resource.unwrap().usage.unwrap().cpu > 0);
 
         Ok(())
     }
@@ -277,7 +277,7 @@ mod tests {
             let received3 = received.clone();
 
             assert_eq!(received.resource.unwrap().limit.unwrap().cpu, i32::MAX);
-            assert!(received2.resource.unwrap().usage.unwrap().cpu <= i32::MAX);
+            assert!(received2.resource.unwrap().usage.unwrap().cpu > 0);
             assert!(received3.status as i32 <= 8);
 
             if status == WorkloadStatus::Crashed as i32 
