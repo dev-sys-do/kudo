@@ -8,13 +8,15 @@ pub struct WorkloadListenerError {
 
 impl WorkloadListenerError {
     pub fn new(msg: &str) -> Self {
-        WorkloadListenerError{details: msg.to_string()}
+        WorkloadListenerError {
+            details: msg.to_string(),
+        }
     }
 }
 
 impl fmt::Display for WorkloadListenerError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f,"{}", self.details)
+        write!(f, "{}", self.details)
     }
 }
 
