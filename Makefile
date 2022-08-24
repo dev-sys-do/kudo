@@ -16,3 +16,7 @@ lint:
 .PHONY: format
 format:
 	cargo fmt -- --check --config format_code_in_doc_comments=true
+
+.PHONY: all
+all: kudo check lint format
+	@echo "Everything ok"
