@@ -129,8 +129,8 @@ impl InstanceProxied {
                 id: Uuid::new_v4().to_string(),
                 status: status.into(),
                 status_description: description.unwrap_or("".to_string()),
-                resource: match Status::from_i32(self.instance.status) {
-                    Some(Status::Running) => self.instance.resource.clone(),
+                resource: match self.instance.status() {
+                    Status::Running => self.instance.resource.clone(),
                     _ => None,
                 },
             }))
