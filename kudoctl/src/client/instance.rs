@@ -58,3 +58,13 @@ pub async fn list(client: &Client) -> anyhow::Result<GetInstancesResponse> {
     );
     Ok(response)
 }
+
+/// Get info about one instance.
+pub async fn get(client: &Client, instance_id: &str) -> anyhow::Result<Instance> {
+    let response: Instance = (*client)
+        .send_json_request::<Instance, ()>(&format!("/instance/{}", instance_id), Method::GET, None)
+        .await
+        .context("Error getting instance")?;
+    debug!("Instance {} received", response.id);
+    Ok(response)
+}
