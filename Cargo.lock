@@ -1012,6 +1012,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tokio",
+ "url",
 ]
 
 [[package]]
