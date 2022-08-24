@@ -13,15 +13,33 @@ struct ErrorResponse {
 
 // Error returned by this module when an endpoint returns an error.
 #[derive(Debug)]
-pub struct RequestError {
+pub struct ErrStatusCode {
     pub error: String,
     pub status: u16,
 }
+
+#[derive(Debug)]
+pub enum RequestError {
+    ErrStatusCode(ErrStatusCode),
+    ReqwestError(reqwest::Error),
+    ParseError(url::ParseError),
+}
+
 impl std::error::Error for RequestError {}
 
 impl std::fmt::Display for RequestError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RequestError ({}): {}", self.status, self.error)
+        match self {
+            RequestError::ErrStatusCode(err) => {
+                write!(
+                    f,
+                    "Error status code : {}. Message: {}",
+                    err.status, err.error
+                )
+            }
+            RequestError::ReqwestError(err) => write!(f, "Reqwest error: {}", err),
+            RequestError::ParseError(err) => write!(f, "Url parse error: {}", err),
+        }
     }
 }
 
@@ -60,15 +78,18 @@ impl Client {
         endpoint: &str,
         method: reqwest::Method,
         body: Option<&U>,
-    ) -> anyhow::Result<Response> {
-        let url = self.base_url.join(endpoint)?;
+    ) -> Result<Response, RequestError> {
+        let url = self
+            .base_url
+            .join(endpoint)
+            .map_err(RequestError::ParseError)?;
         let mut request = (*self).client.request(method, url);
 
         if let Some(body) = body {
             request = request.json(body);
         }
 
-        request.send().await.map_err(anyhow::Error::from)
+        request.send().await.map_err(RequestError::ReqwestError)
     }
 
     // Send a request to the controller and deserialize the response.
@@ -79,7 +100,7 @@ impl Client {
         endpoint: &str,
         method: reqwest::Method,
         body: Option<&U>,
-    ) -> anyhow::Result<T> {
+    ) -> Result<T, RequestError> {
         let response = self.send_request(endpoint, method, body).await?;
 
         // Check if the response is an error.
@@ -88,13 +109,17 @@ impl Client {
 
             // Read the error message from the response body.
 
-            let error_response: ErrorResponse = response.json().await?;
-            return Err(anyhow::Error::from(RequestError {
+            let error_response: ErrorResponse =
+                response.json().await.map_err(RequestError::ReqwestError)?;
+            return Err(RequestError::ErrStatusCode(ErrStatusCode {
                 error: error_response.error,
                 status,
             }));
         }
 
-        response.json::<T>().await.map_err(anyhow::Error::from)
+        response
+            .json::<T>()
+            .await
+            .map_err(RequestError::ReqwestError)
     }
 }
