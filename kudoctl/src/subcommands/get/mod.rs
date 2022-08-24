@@ -1,10 +1,11 @@
 mod instance;
 mod instances;
 mod output;
+mod resource;
 mod resources;
 use self::output::OutputFormat;
 use crate::config;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::{Args, ValueEnum};
 
 #[derive(Debug, Args)]
@@ -48,10 +49,8 @@ pub async fn execute(args: GetSubcommand, conf: &config::Config) -> Result<Strin
 
     match args.subject {
         GetSubjects::Resources => resources::execute(conf, format, show_header).await,
+        GetSubjects::Resource => resource::execute(conf, format, args.id).await,
         GetSubjects::Instances => instances::execute(conf, format, show_header).await,
         GetSubjects::Instance => instance::execute(conf, format, args.id).await,
-        GetSubjects::Resource => {
-            bail!(format!("{:?} not implemented yet", args.subject))
-        }
     }
 }
