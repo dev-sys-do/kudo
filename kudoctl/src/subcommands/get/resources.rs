@@ -3,13 +3,9 @@ use crate::{
     config, resource,
 };
 use anyhow::{Context, Result};
-use clap::Args;
 use std::fmt::Display;
 
 use super::output::{self, OutputFormat}; // import without risk of name clashing
-
-#[derive(Debug, Args)]
-pub struct GetResources {}
 
 /// get resources subcommand execution
 pub async fn execute(
