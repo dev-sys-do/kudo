@@ -1,6 +1,8 @@
+PROFILE ?= dev
+
 .PHONY: kudo
 kudo:
-	cargo build --release
+	cargo build --profile $(PROFILE)
 
 .PHONY: check
 check:
