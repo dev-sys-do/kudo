@@ -60,3 +60,17 @@ pub async fn list(client: &Client) -> Result<GetWorkloadResponse> {
     );
     Ok(response)
 }
+
+/// Delete a workload.
+pub async fn delete(client: &Client, id: &str) -> Result<()> {
+    let response = (*client)
+        .send_json_request::<IdResponse, ()>(
+            format!("/workload/{}", id).as_str(),
+            Method::DELETE,
+            None,
+        )
+        .await
+        .context("Error deleting workload")?;
+    debug!("Workload {} deleted", response.id);
+    Ok(())
+}
