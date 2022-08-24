@@ -16,3 +16,10 @@ lint:
 .PHONY: format
 format:
 	cargo fmt -- --check --config format_code_in_doc_comments=true
+
+.PHONY: ci
+ci: kudo check lint format
+
+.PHONY: clean
+clean:
+	cargo clean
