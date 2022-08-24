@@ -1,3 +1,4 @@
+mod instance;
 mod instances;
 mod output;
 mod resources;
@@ -48,7 +49,8 @@ pub async fn execute(args: GetSubcommand, conf: &config::Config) -> Result<Strin
     match args.subject {
         GetSubjects::Resources => resources::execute(conf, format, show_header).await,
         GetSubjects::Instances => instances::execute(conf, format, show_header).await,
-        GetSubjects::Resource | GetSubjects::Instance => {
+        GetSubjects::Instance => instance::execute(conf, format, args.id).await,
+        GetSubjects::Resource => {
             bail!(format!("{:?} not implemented yet", args.subject))
         }
     }
