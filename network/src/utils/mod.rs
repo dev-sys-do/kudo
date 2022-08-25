@@ -17,6 +17,39 @@ pub(crate) fn run_command(cmd: &str, args: &[&str]) -> Result<String, KudoNetwor
     wrap_command_output(output, cmd, args)
 }
 
+pub(crate) fn default_interface_name() -> Result<String, KudoNetworkError> {
+    default_net::get_default_interface()
+        .map(|interface| interface.name)
+        .map_err(|err| {
+            KudoNetworkError::DefaultNetworkInterfaceError(format!(
+                "Could not find default interface : {}",
+                err
+            ))
+        })
+}
+
+pub fn namespace_name(instance_id: String) -> String {
+    // Linux network interface names are size limited!
+    format!(
+        "kns{}",
+        &instance_id[..min(IFACE_MAX_SIZE, instance_id.len())]
+    )
+}
+
+pub(crate) fn veth_out_name(instance_id: String) -> String {
+    format!(
+        "kvo{}",
+        &instance_id[..min(IFACE_MAX_SIZE, instance_id.len())]
+    )
+}
+
+pub(crate) fn veth_in_name(instance_id: String) -> String {
+    format!(
+        "kvi{}",
+        &instance_id[..min(IFACE_MAX_SIZE, instance_id.len())]
+    )
+}
+
 fn wrap_command_output(
     output: Result<Output, std::io::Error>,
     cmd: &str,
