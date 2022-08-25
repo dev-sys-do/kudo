@@ -1,4 +1,4 @@
-use crate::workload_manager::workload_listener::workload_listener::WorkloadListener;
+use crate::workload_manager::workload_listener::listener::WorkloadListener;
 
 use futures::StreamExt;
 
@@ -25,7 +25,6 @@ impl ContainerListener {
     /// * `container_id` - container's id
     /// * `instance` - instance's struct
     /// * `docker_connection` - bollard's Docker Struct
-    ///
     pub async fn fetch_instance_status(
         container_id: &str,
         instance: &Instance,
@@ -149,7 +148,6 @@ impl ContainerListener {
     ///
     /// * `cpu` - cpu usage
     /// * `pre_cpu` - pre_cpu usage
-    ///
     fn calculate_cpu_usage(cpu: CPUStats, pre_cpu: CPUStats) -> i32 {
         let mut sys = System::new_all();
         sys.refresh_all();
@@ -220,7 +218,8 @@ impl WorkloadListener for ContainerListener {
 mod tests {
     use super::WorkloadListener;
     use bollard::service::HealthConfig;
-    use bollard::{container::Config, Docker};
+    use bollard::{container::Config, image::CreateImageOptions, Docker};
+    use futures::TryStreamExt;
     use proto::agent::Status as WorkloadStatus;
     use proto::agent::{Instance, Port, Resource, ResourceSummary, Status, Type as IType};
     use std::sync::mpsc::channel;
@@ -230,6 +229,19 @@ mod tests {
         //test setup
         #[cfg(unix)]
         let docker = Docker::connect_with_socket_defaults().unwrap();
+
+        docker
+            .create_image(
+                Some(CreateImageOptions::<&str> {
+                    from_image: "debian:latest",
+                    ..Default::default()
+                }),
+                None,
+                None,
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap();
 
         let health_check = Some(HealthConfig {
             test: Some(vec![
@@ -317,6 +329,20 @@ mod tests {
         //test setup
         #[cfg(unix)]
         let docker = Docker::connect_with_socket_defaults().unwrap();
+
+        docker
+            .create_image(
+                Some(CreateImageOptions::<&str> {
+                    from_image: "debian:latest",
+                    ..Default::default()
+                }),
+                None,
+                None,
+            )
+            .try_collect::<Vec<_>>()
+            .await
+            .unwrap();
+
         let cfg = Config {
             cmd: Some(vec!["/bin/sleep", "5"]),
             image: Some("debian"),
