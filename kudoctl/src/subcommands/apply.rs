@@ -54,7 +54,9 @@ pub async fn execute(args: Apply, conf: &config::Config) -> Result<String> {
 
         match &resource_data {
             Resource::Workload(workload) => {
-                if let Ok(workload) = client::workload::get(&client, &workload.name).await {
+                if let Ok(workload) =
+                    client::workload::get(&client, &conf.namespace, &workload.name).await
+                {
                     info!("Workload {} already exists", workload.name);
                     return Ok(String::new());
                 }
@@ -66,7 +68,7 @@ pub async fn execute(args: Apply, conf: &config::Config) -> Result<String> {
         Resource::Workload(workload) => {
             debug!("Creating workload {}", workload.name);
 
-            let workload_id = client::workload::create(&client, &workload).await?;
+            let workload_id = client::workload::create(&client, &conf.namespace, &workload).await?;
 
             let instance_id = client::instance::create(&client, &workload_id).await?;
 
