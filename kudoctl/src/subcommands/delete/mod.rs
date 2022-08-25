@@ -1,6 +1,7 @@
 use crate::config;
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::{Args, ValueEnum};
+mod instance;
 mod resource;
 
 #[derive(Debug, Args)]
@@ -28,9 +29,7 @@ enum Subjects {
 pub async fn execute(args: Subcommand, conf: &config::Config) -> Result<String> {
     match args.subject {
         Subjects::Resource => resource::execute(conf, args.id.as_str()).await,
-        Subjects::Instance => {
-            bail!("{:?} not implemented yet", args.subject)
-        }
+        Subjects::Instance => instance::execute(conf, args.id.as_str()).await,
     }?;
 
     Ok(String::new())

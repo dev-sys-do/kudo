@@ -68,3 +68,13 @@ pub async fn get(client: &Client, instance_id: &str) -> anyhow::Result<Instance>
     debug!("Instance {} received", response.id);
     Ok(response)
 }
+
+/// Delete an instance with the given id.
+pub async fn delete(client: &Client, instance_id: &str) -> anyhow::Result<()> {
+    (*client)
+        .send_json_request::<(), ()>(&format!("/instance/{}", instance_id), Method::DELETE, None)
+        .await
+        .context("Error deleting instance")?;
+    debug!("Instance {} deleted", instance_id);
+    Ok(())
+}
