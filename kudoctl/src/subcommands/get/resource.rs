@@ -20,7 +20,7 @@ pub async fn execute(
     let search = search.unwrap();
 
     let client = Client::new(conf).context("Error creating client")?;
-    let result = client::workload::get(&client, search.as_str()).await?;
+    let result = client::workload::get(&client, &conf.namespace, search.as_str()).await?;
 
     output::format_output(result, format)
 }

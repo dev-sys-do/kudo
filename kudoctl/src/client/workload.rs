@@ -13,9 +13,17 @@ use super::request::Client;
 /// Creates a workload in the cluster.
 ///
 /// Returns the id of the workload.
-pub async fn create(client: &Client, workload: &workload::Workload) -> Result<String> {
+pub async fn create(
+    client: &Client,
+    namespace: &str,
+    workload: &workload::Workload,
+) -> Result<String> {
     let response: IdResponse = (*client)
-        .send_json_request("/workload", Method::PUT, Some(workload))
+        .send_json_request(
+            format!("/workload/{}", namespace).as_str(),
+            Method::PUT,
+            Some(workload),
+        )
         .await
         .context("Error creating workload")?;
     debug!("Workload {} created", response.id);
@@ -25,10 +33,14 @@ pub async fn create(client: &Client, workload: &workload::Workload) -> Result<St
 /// Get info about a workload.
 ///
 /// Returns the workload info.
-pub async fn get(client: &Client, workload_id: &str) -> Result<workload::Workload> {
+pub async fn get(
+    client: &Client,
+    namespace: &str,
+    workload_id: &str,
+) -> Result<workload::Workload> {
     let response: workload::Workload = (*client)
         .send_json_request::<workload::Workload, ()>(
-            &format!("/workload/{}", workload_id),
+            &format!("/workload/{}/{}", namespace, workload_id),
             Method::GET,
             None,
         )
@@ -48,9 +60,13 @@ pub struct GetWorkloadResponse {
 /// Get the workloads in the cluster.
 ///
 /// Returns a vector of workloads.
-pub async fn list(client: &Client) -> Result<GetWorkloadResponse> {
+pub async fn list(client: &Client, namespace: &str) -> Result<GetWorkloadResponse> {
     let response: GetWorkloadResponse = (*client)
-        .send_json_request::<GetWorkloadResponse, ()>("/workload", Method::GET, None)
+        .send_json_request::<GetWorkloadResponse, ()>(
+            format!("/workload/{}", namespace).as_str(),
+            Method::GET,
+            None,
+        )
         .await
         .context("Error getting workloads")?;
     debug!(
