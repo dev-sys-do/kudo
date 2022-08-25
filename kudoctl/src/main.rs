@@ -23,6 +23,11 @@ struct Cli {
     #[clap(short, long)]
     host: Option<String>,
 
+    /// Define which namespace to target
+    /// If not defined, the default namespace is used
+    #[clap(short, long, global = true)]
+    namespace: Option<String>,
+
     /// Execute a command on the connected cluster
     #[clap(subcommand)]
     command: subcommands::Subcommands,
@@ -68,6 +73,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     if let Some(host) = cli.host.as_deref() {
         global_config.controller_url = host.to_string();
+    }
+
+    // Set namespace if defined
+    if let Some(namespace) = cli.namespace {
+        global_config.namespace = namespace;
     }
 
     subcommands::match_subcommand(cli.command, &global_config).await;

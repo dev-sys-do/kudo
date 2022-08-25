@@ -58,6 +58,7 @@ pub struct Config {
     config_file: PathBuf,
     pub controller_url: String,
     pub verbosity_level: LevelFilter,
+    pub namespace: String,
 }
 
 // Read the config file and return a Config object.
@@ -109,6 +110,7 @@ pub fn read_config() -> Result<Config, Box<dyn std::error::Error>> {
         config_file: file_path,
         controller_url,
         verbosity_level,
+        namespace: "default".to_string(),
     })
 }
 
