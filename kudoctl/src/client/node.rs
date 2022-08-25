@@ -5,6 +5,7 @@ use log::debug;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 
+/// Representation of a node of the cluster.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Node {
     pub id: String,
@@ -22,6 +23,7 @@ pub struct GetNodesResponse {
     pub show_header: bool,
 }
 
+/// Get the nodes connected to the cluster controller.
 pub async fn list(client: &Client) -> Result<GetNodesResponse> {
     let response = (*client)
         .send_json_request::<GetNodesResponse, ()>("/node", Method::GET, None)
@@ -32,5 +34,15 @@ pub async fn list(client: &Client) -> Result<GetNodesResponse> {
         response.count,
         response.nodes.len()
     );
+    Ok(response)
+}
+
+/// Get the node with the given id.
+pub async fn get(client: &Client, node_id: &str) -> Result<Node> {
+    let response = (*client)
+        .send_json_request::<Node, ()>(&format!("/node/{}", node_id), Method::GET, None)
+        .await
+        .context("Error getting node")?;
+    debug!("Node {} received", response.id);
     Ok(response)
 }
