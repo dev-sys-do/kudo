@@ -6,63 +6,105 @@
 
 The objective of the network service is to make several instances communicate with each other as if they were all connected to a single private network, no matter if they are on the same machine or not.
 
+It also brings a network isolation layer between instances.
+
 ### Suggested approach
 
-To try to solve this problem, the network service is responsible for creating, configuring and deleting virtual network interfaces used to connect instances to each other within a cluster.
+To try to solve this problem, the agent service has to use a network library to setup network interfaces, namespaces, routing tables and iptables rules for each new node or new instance.
 
-This service has to be running on all nodes of the cluster.
+Each instance run in its own network namespace. Its default network interface is a veth one, paired with another veth interface outside the instance namespace.
 
-When adding a new node to a cluster, a call to the network service must be done to set up a new container network interface (CNI) service. There is one CNI service per node, and that service bridges the networking interfaces associated with the instances running on the node it controls to the rest of the cluster.
+All instance's veth interfaces (outside their instance's namespace) running on the same node are connected to a single bridge interface called Container Network Interface (CNI).
 
-A call to the network service must also be made before creating a new instance in order to set up the virtual network interface connecting the instance to a CNI.
+The CNI is also connected to the default node's interface to allow communications from and to outside the node.
 
-After the destruction of an instance, the network service must be called to remove the network interface associated with it and reconfigure the routing tables.
+Bellow is a representation of the network interfaces and namespaces in a Kudo node:
 
 ![Node example](schema.png)
 
-## API
+## API examples
 
-### Messages
+### Setup node
 
-```protobuf
-// Request structure used to create a new virtual network interface
-message CreateNetworkInterfaceRequest {
-    string workload_id = 1;
-    string ip_address = 2;
-    repeated int32 ports = 3;
-}
+Use `setup_node` function from `node` module each time you want to create a CNI and configure
+iptables rules for a new node.
 
-// Response structure returned after a new virtual interface has been created
-message CreateNetworkInterfaceResponse {
-    string interface_name = 1;
-}
+```rust
+let node_id = "node";
+let node_ip_addr = Ipv4Addr::from_str("10.0.0.1").unwrap();
+let node_ip_cidr = Ipv4Inet::new(node_ip_addr, 24).unwrap();
 
-// Request structure used to delete a virtual interface
-message DeleteNetworkInterfaceRequest {
-    string workload_id = 1;
-}
-
-// Request structure used to setup a new node's network
-message SetupRequest {
-    string ip_address = 1;
-    string sub_network = 2;
-}
-
-// Response structure returned after a new node's network has been setup
-message SetupResponse {
-    string interface_name = 1;
-}
+let request = SetupNodeRequest::new(node_id.to_string(), node_ip_cidr);
+let response = setup_node(request).unwrap();
+println!("CNI name: {}", response.interface_name);
 ```
 
-### Services
+After each node reboot, you need to reconfigure iptables running `setup_iptables` function from
+`node` module.
 
-```protobuf
-service Network {
-    // Create a new virtual inerface and add it to the node CNI
-    rpc CreateNetworkInterface(CreateNetworkInterfaceRequest) returns (CreateNetworkInterfaceResponse) {}
-    // Delete a virtual interface
-    rpc DeleteNetworkInterface(DeleteNetworkInterfaceRequest) returns (Empty) {}
-    // Create a new virtual network interface (CNI)
-    rpc Setup(SetupRequest) returns (SetupResponse) {}
-}
+```rust
+let node_id = "node";
+let request = SetupIptablesRequest::new(node_id.to_string());
+
+setup_iptables(request).unwrap();
+```
+
+### Setup instance
+
+Before running a new instance, please call `setup_instance` function from `instance` module to setup
+network namespace, interfaces and routing tables.
+
+```rust
+let node_id = "node";
+let node_ip_addr = Ipv4Addr::from_str("10.0.0.1").unwrap();
+let instance_id = "instance";
+let instance_ip_addr = Ipv4Addr::from_str("10.0.0.2").unwrap();
+let instance_ip_cidr = Ipv4Inet::new(instance_ip_addr, 24).unwrap();
+let ports = vec![Port::new(80, 8080)];
+
+let request = SetupInstanceRequest::new(
+    node_id.to_string(),
+    node_ip_addr,
+    instance_id.to_string(),
+    instance_ip_cidr,
+    ports,
+);
+let response = setup_instance(request).unwrap();
+println!("Instance default interface: {}", response.interface_name);
+println!("Network namespace: {}", response.namespace_name);
+```
+
+You can also get the namespace's name of a given instance with `get_namespace_name` from `utils`
+module.
+
+```rust
+let instance_id = "instance";
+let namespace_name = get_namespace_name(instance_id.to_string());
+println!("Namespace of {}: {}", instance_id, namespace_name);
+```
+
+### Clean up
+
+To delete CNI and iptables rules of a specific node, use `clean_node` function from `node` module.
+
+```rust
+let node_id = "node";
+let request = CleanNodeRequest::new(node_id.to_string());
+clean_node(request).unwrap();
+```
+
+Run `clean_instance` function from `instance` module to delete network namespace and interfaces of a
+specific instance.
+
+```rust
+let instance_id = "instance";
+let instance_ip_addr = Ipv4Addr::from_str("10.0.0.2").unwrap();
+let instance_ip_cidr = Ipv4Inet::new(instance_ip_addr, 24).unwrap();
+let ports = vec![Port::new(80, 8080)];
+let request = CleanInstanceRequest::new(
+    instance_id.to_string(),
+    ports,
+    instance_ip_cidr,
+);
+clean_instance(request).unwrap();
 ```
