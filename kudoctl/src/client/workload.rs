@@ -8,7 +8,7 @@ use crate::{
     resource::{self, workload},
 };
 
-use super::request::Client;
+use super::request::{Client, RequestError};
 
 /// Creates a workload in the cluster.
 ///
@@ -17,16 +17,34 @@ pub async fn create(
     client: &Client,
     namespace: &str,
     workload: &workload::Workload,
-) -> Result<String> {
+) -> std::result::Result<String, RequestError> {
     let response: IdResponse = (*client)
         .send_json_request(
             format!("/workload/{}", namespace).as_str(),
             Method::PUT,
             Some(workload),
         )
-        .await
-        .context("Error creating workload")?;
+        .await?;
     debug!("Workload {} created", response.id);
+    Ok(response.id)
+}
+
+/// Updates a workload in the cluster.
+///
+/// Returns the id of the workload.
+pub async fn update(
+    client: &Client,
+    namespace: &str,
+    workload: &workload::Workload,
+) -> std::result::Result<String, RequestError> {
+    let response: IdResponse = (*client)
+        .send_json_request(
+            format!("/workload/{}/{}", namespace, workload.name).as_str(),
+            Method::PATCH,
+            Some(workload),
+        )
+        .await?;
+    debug!("Workload {} updated", response.id);
     Ok(response.id)
 }
 
