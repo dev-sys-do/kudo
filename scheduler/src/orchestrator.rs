@@ -1,5 +1,3 @@
-use std::{sync::{Arc}};
-
 use log::{info, debug};
 use proto::scheduler::Instance;
 
@@ -13,30 +11,34 @@ pub enum OrchestratorError {
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Orchestrator {
-    instances: Arc<Storage<Instance>>,
-    nodes: Arc<Storage<Node>>,
+    instances: Storage<Instance>,
+    nodes: Storage<Node>,
 }
 
 impl Orchestrator {
-    pub fn new(instances: Arc<Storage<Instance>>, nodes: Arc<Storage<Node>>) -> Self {
+    pub fn new(instances: Storage<Instance>, nodes: Storage<Node>) -> Self {
         Orchestrator {
             instances,
             nodes
         }
     }
 
+    pub fn register_node(&mut self, node: Node) -> Result<(), OrchestratorError> {
+        self.nodes.update(&node.id.clone(), node);
+        Ok(())
+    }
+
     pub fn find_best_node(&self, instance: &Instance) -> Result<(), OrchestratorError> {
         debug!("Finding best node for instance: {:?}", instance);
         
-        let nodes_storage = self.nodes.clone();
-        let nodes = nodes_storage.get_all();
+        let nodes = self.nodes.get_all();
 
         if nodes.len() == 0 {
             debug!("No nodes available");
             return Err(OrchestratorError::NoAvailableNodes);
         }
 
-        for (_, node) in self.nodes.clone().as_ref().get_all() {
+        for (_, node) in nodes {
             info!("{:?}", node);
         }
 

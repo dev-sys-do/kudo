@@ -3,24 +3,21 @@ use std::sync::Arc;
 use anyhow::Result;
 use log::{debug, info};
 use proto::scheduler::{
-    instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
-    Instance, InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse,
+    instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer, InstanceStatus, Status, NodeRegisterResponse,
 };
-use tokio::sync::mpsc;
-use tokio::{sync::oneshot, task::JoinHandle};
-use tonic::{transport::Server, Response};
+use tokio::{task::JoinHandle, sync::Mutex};
+use tonic::transport::Server;
+use tokio::sync::{mpsc, oneshot};
+use uuid::Uuid;
 
 use crate::SchedulerError;
 use crate::{
-    config::Config, instance_listener::InstanceListener, node_listener::NodeListener,
-    storage::Storage, Event, Node,
+    instance_listener::InstanceListener, node_listener::NodeListener, storage::Storage, Event, orchestrator::{Orchestrator}, Node,
 };
 
 #[derive(Debug)]
 pub struct Manager {
-    instances: Arc<Storage<Instance>>,
-    nodes: Arc<Storage<Node>>,
-    config: Arc<Config>,
+    orchestrator: Arc<Mutex<Orchestrator>>,
 }
 
 impl Manager {
@@ -29,30 +26,14 @@ impl Manager {
     /// Returns:
     ///
     /// A new Manager struct
-    pub fn new(config: Config) -> Self {
+    pub fn new() -> Self {
+        let instances = Storage::new();
+        let nodes = Storage::new();
+        let orchestrator = Orchestrator::new(instances, nodes);
+
         Manager {
-            instances: Arc::new(Storage::new()),
-            nodes: Arc::new(Storage::new()),
-            config: Arc::new(config),
+            orchestrator: Arc::new(Mutex::new(orchestrator)),
         }
-    }
-
-    /// This function returns a reference to the instances storage.
-    ///
-    /// Returns:
-    ///
-    /// A reference to the instances storage.
-    pub fn instances(&self) -> Arc<Storage<Instance>> {
-        self.instances.clone()
-    }
-
-    /// This function returns a reference to the nodes storage.
-    ///
-    /// Returns:
-    ///
-    /// A reference to the nodes storage.
-    pub fn nodes(&self) -> Arc<Storage<Node>> {
-        self.nodes.clone()
     }
 
     /// It creates a gRPC server that listens on port 50051 and spawns a new thread to handle incoming
@@ -120,6 +101,7 @@ impl Manager {
     /// A JoinHandle<()>
     fn listen_events(&self, mut rx: mpsc::Receiver<Event>) -> JoinHandle<()> {
         info!("listening for incoming events ...");
+        let orchestrator = Arc::clone(&self.orchestrator);
 
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
@@ -127,34 +109,68 @@ impl Manager {
                 match event {
                     Event::InstanceCreate(instance, tx) => {
                         info!("received instance create event : {:?}", instance);
-                        tx.send(Ok(InstanceStatus::default())).await.unwrap();
-                    }
-                    Event::InstanceStart(id, tx) => {
-                        info!("received instance start event : {:?}", id);
-                        tx.send(Ok(Response::new(()))).unwrap();
-                    }
-                    Event::InstanceStop(id, tx) => {
-                        info!("received instance stop event : {:?}", id);
-                        tx.send(Ok(Response::new(()))).unwrap();
-                    }
-                    Event::InstanceDestroy(id, tx) => {
-                        info!("received instance destroy event : {:?}", id);
-                        tx.send(Ok(Response::new(()))).unwrap();
-                    }
+
+                        // should be move in the orchestrator but it's here for testing
+                        match orchestrator.lock().await.find_best_node(&instance) {
+                            Ok(_) => {
+                                info!("found best node for instance : {:?}", instance);
+                            },
+                            Err(err) => {
+                                info!("error finding best node for instance : {:?}", err);
+
+                                let instance_status = InstanceStatus {
+                                    id: instance.id,
+                                    status: Status::Failed.into(),
+                                    status_description: format!("Error thrown by the orchestrator: {:?}", err),
+                                    resource: None
+                                };
+
+                                let _ = tx.send(Ok(instance_status)).await;
+                            },
+                        };
+                    },
+                    Event::InstanceStart(instance) => {
+                        info!("received instance start event : {:?}", instance);
+                    },
+                    Event::InstanceStop(instance) => {
+                        info!("received instance stop event : {:?}", instance);
+                    },
+                    Event::InstanceDestroy(instance) => {
+                        info!("received instance destroy event : {:?}", instance);
+                    },
                     Event::NodeRegister(request, tx) => {
                         info!("received node register event : {:?}", request);
-                        tx.send(Ok(Response::new(NodeRegisterResponse::default())))
-                            .unwrap();
-                    }
-                    Event::NodeUnregister(request, tx) => {
-                        info!("received node unregister event : {:?}", request);
-                        tx.send(Ok(Response::new(NodeUnregisterResponse::default())))
-                            .unwrap();
-                    }
-                    Event::NodeStatus(status, tx) => {
-                        info!("received node status event : {:?}", status);
-                        tx.send(Ok(())).await.unwrap();
-                    }
+
+                        // todo: parse certificate and get the node information
+                        let node = Node {
+                            id: Uuid::new_v4().to_string(),
+                        };
+
+                        match orchestrator.lock().await.register_node(node) {
+                            Ok(_) => {
+                                info!("successfully registered node");
+                                
+                                let response = NodeRegisterResponse {
+                                    code: 0,
+                                    description: "Welcome to the cluster".to_string(),
+                                    subnet: "".to_string(),
+                                };
+        
+                                tx.send(Ok(tonic::Response::new(response))).unwrap();
+                            },
+                            Err(err) => {
+                                info!("error while registering node : {:?}", err);
+
+                                let response = NodeRegisterResponse {
+                                    code: 1,
+                                    description: format!("Error thrown by the orchestrator: {:?}", err),
+                                    subnet: "".to_string(),
+                                };
+        
+                                tx.send(Ok(tonic::Response::new(response))).unwrap();
+                            },
+                        };
+                    },
                 }
             }
         })
