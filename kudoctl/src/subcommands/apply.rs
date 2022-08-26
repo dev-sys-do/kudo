@@ -1,7 +1,10 @@
 use std::io::{self, Read};
 
 use crate::{
-    client::{self, request::Client},
+    client::{
+        self,
+        request::{Client, RequestError},
+    },
     config,
     resource::Resource,
 };
@@ -49,34 +52,56 @@ pub async fn execute(args: Apply, conf: &config::Config) -> Result<String> {
     let resource_data: Resource =
         serde_yaml::from_str(&yaml).context("Error parsing file resource")?;
 
-    if args.no_update {
-        //  check if the workload already exists
+    let mut needs_instance_create = true;
 
-        match &resource_data {
-            Resource::Workload(workload) => {
-                if let Ok(workload) =
-                    client::workload::get(&client, &conf.namespace, &workload.name).await
-                {
-                    info!("Workload {} already exists", workload.name);
-                    return Ok(String::new());
+    match resource_data {
+        Resource::Workload(ref workload) => {
+            debug!("Pushing workload {}", workload.name);
+
+            let workload_id = match client::workload::create(&client, &conf.namespace, workload)
+                .await
+            {
+                Ok(id) => {
+                    info!("Workload {} created", id);
+                    id
                 }
+
+                Err(e) => match e {
+                    RequestError::ErrStatusCode(ref status) => {
+                        if status.status == 409 {
+                            info!("Workload {} already exists", workload.name);
+                            needs_instance_create = false;
+
+                            let res = client::workload::update(&client, &conf.namespace, workload)
+                                .await
+                                .context("Error updating workload");
+                            match res {
+                                Ok(id) => {
+                                    info!("Workload {} updated", id);
+                                    id
+                                }
+                                Err(e) => {
+                                    bail!("Error updating workload: {}", e);
+                                }
+                            }
+                        } else {
+                            bail!("Error creating workload {}: {}", workload.name, e);
+                        }
+                    }
+                    _ => bail!("Error creating workload {}: {}", workload.name, e),
+                },
+            };
+
+            if needs_instance_create {
+                let instance_id = client::instance::create(&client, &workload_id).await?;
+
+                info!(
+                    "Workload {} created with id {} and started with instance {}",
+                    workload.name, workload_id, instance_id
+                );
             }
         }
     }
 
-    match resource_data {
-        Resource::Workload(workload) => {
-            debug!("Creating workload {}", workload.name);
-
-            let workload_id = client::workload::create(&client, &conf.namespace, &workload).await?;
-
-            let instance_id = client::instance::create(&client, &workload_id).await?;
-
-            info!(
-                "Workload {} created with id {} and started with instance {}",
-                workload.name, workload_id, instance_id
-            );
-        }
-    }
     Ok("".to_string())
 }
