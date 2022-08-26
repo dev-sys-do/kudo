@@ -21,6 +21,7 @@ pub enum OrchestratorError {
     NetworkError(String),
     NotEnoughResources,
     FromProxyError(ProxyError),
+    InvalidWorkload,
 }
 
 #[derive(Debug)]
@@ -264,32 +265,135 @@ impl Orchestrator {
 
         let nodes = self.nodes.get_all();
 
-        if nodes.len() == 0 {
+        let started_nodes: Vec<(_, &NodeProxied)> = nodes
+            .iter()
+            .filter(|node| node.1.node.status == Status::Running)
+            .collect();
+
+        if started_nodes.len() == 0 {
             debug!("No nodes available");
             return Err(OrchestratorError::NoAvailableNodes);
         }
 
-        for (_, node_proxied) in nodes {
-            let has_enough_resources = match Self::has_enough_resources(
-                node_proxied.node.resource.clone().unwrap(),
-                instance.resource.clone().unwrap(),
-            ) {
-                Ok(_) => true,
+        let mut best_node_id: Option<String> = None;
+        let mut best_node_score: f64 = 0.0;
+
+        for (_, node_proxied) in started_nodes {
+            let node_score = match self
+                .score_node_for_an_new_instance(node_proxied.node.clone(), instance.clone())
+            {
+                Ok(score) => score,
                 Err(_) => continue,
             };
 
-            if has_enough_resources {
-                info!(
-                    "scheduling instance {:?} on node: {:?}",
-                    instance.id.clone(),
-                    node_proxied.node.id.clone()
-                );
-
-                return Ok(node_proxied.node.id.clone());
+            if node_score > best_node_score {
+                best_node_score = node_score;
+                best_node_id = Some(node_proxied.id.clone());
             }
         }
 
-        Err(OrchestratorError::NotEnoughResources)
+        match best_node_id {
+            Some(node_id) => {
+                info!(
+                    "scheduling instance {:?} on node: {:?}",
+                    instance.id.clone(),
+                    node_id
+                );
+
+                return Ok(node_id);
+            }
+            None => Err(OrchestratorError::NotEnoughResources),
+        }
+    }
+
+    /// It takes a node and an instance and returns a score for the node based on the resources of the
+    /// instance and the resources of the node. The score is a float between 0 and 1, with 1 being
+    /// the best score.
+    ///
+    /// Arguments:
+    ///
+    /// * `node`: Node,
+    /// * `instance`: Instance
+    ///
+    /// Returns:
+    ///
+    /// The score of the node for the new instance.
+    fn score_node_for_an_new_instance(
+        &self,
+        node: Node,
+        instance: Instance,
+    ) -> Result<f64, OrchestratorError> {
+        let instances_proxied = self.instances.get_all();
+
+        let node_instances_proxied =
+            instances_proxied
+                .iter()
+                .filter(|instance| match instance.1.node_id.clone() {
+                    Some(id) => id == node.id,
+                    None => false,
+                });
+
+        let mut sum_instances_resource_limit: ResourceSummary = match instance.resource {
+            Some(resource) => match resource.limit {
+                Some(limit) => ResourceSummary {
+                    cpu: limit.cpu,
+                    memory: limit.memory,
+                    disk: limit.disk,
+                },
+                None => {
+                    return Err(OrchestratorError::InvalidWorkload);
+                }
+            },
+            None => return Err(OrchestratorError::InvalidWorkload),
+        };
+
+        for (_, instance_proxied) in node_instances_proxied {
+            match instance_proxied.instance.resource.clone() {
+                Some(resource) => match resource.limit {
+                    Some(limit) => {
+                        sum_instances_resource_limit.cpu += limit.cpu;
+                        sum_instances_resource_limit.memory += limit.memory;
+                        sum_instances_resource_limit.disk += limit.disk;
+                    }
+                    None => {}
+                },
+                None => {}
+            }
+        }
+
+        let node_resource_summary_limit = match node.resource {
+            Some(resource) => match resource.limit {
+                Some(limit) => ResourceSummary {
+                    cpu: limit.cpu,
+                    memory: limit.memory,
+                    disk: limit.disk,
+                },
+                None => {
+                    return Err(OrchestratorError::InvalidWorkload);
+                }
+            },
+            None => return Err(OrchestratorError::InvalidWorkload),
+        };
+
+        let mut node_score = 0.0;
+
+        if Self::has_enough_resources(
+            node_resource_summary_limit.clone(),
+            sum_instances_resource_limit.clone(),
+        ) {
+            let cpu_score =
+                sum_instances_resource_limit.cpu as f64 / node_resource_summary_limit.cpu as f64;
+
+            let memory_score = sum_instances_resource_limit.memory as f64
+                / node_resource_summary_limit.memory as f64;
+
+            let disk_score =
+                sum_instances_resource_limit.disk as f64 / node_resource_summary_limit.disk as f64;
+
+            node_score = 1.0 - (cpu_score + memory_score + disk_score) / 3.0;
+        }
+
+        Ok(node_score)
     }
 
     /// It takes a `Resource` struct, and returns a `ResourceSummary` struct
@@ -302,6 +406,7 @@ impl Orchestrator {
     /// Returns:
     ///
     /// A Result<ResourceSummary, OrchestratorError>
+    #[allow(dead_code)]
     fn compute_available_resources(
         resource: Resource,
     ) -> Result<ResourceSummary, OrchestratorError> {
@@ -320,28 +425,23 @@ impl Orchestrator {
         })
     }
 
-    /// "If the needed resources are not defined, return an error. Otherwise, return true if the
-    /// available resources are greater than or equal to the needed resources."
-    ///
-    /// The function is a bit more complicated than that, but that's the gist of it
+    /// "Returns true if the total resources limits of the instances are less than 95%
+    /// of the node's resources limit"
     ///
     /// Arguments:
     ///
-    /// * `available`: Resource - The available resources on the node
-    /// * `needed`: The resources that the user wants to use
+    /// * `available_resources`: ResourceSummary - The available resources on the node
+    /// * `needed_resources`: ResourceSummary - The resources that the user wants to use
     ///
     /// Returns:
     ///
     /// A boolean value.
     fn has_enough_resources(
-        available: Resource,
-        needed: Resource,
-    ) -> Result<bool, OrchestratorError> {
-        let available_resources = Self::compute_available_resources(available)?;
-        let needed_resources = needed.limit.ok_or(OrchestratorError::NotEnoughResources)?;
-
-        Ok(available_resources.cpu >= needed_resources.cpu
-            && available_resources.memory >= needed_resources.memory
-            && available_resources.disk >= needed_resources.disk)
+        available_resources: ResourceSummary,
+        needed_resources: ResourceSummary,
+    ) -> bool {
+        available_resources.cpu as f64 * 0.95 >= needed_resources.cpu as f64
+            && available_resources.memory as f64 * 0.95 >= needed_resources.memory as f64
+            && available_resources.disk as f64 * 0.95 >= needed_resources.disk as f64
     }
 }

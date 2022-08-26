@@ -13,7 +13,7 @@ use tonic::{Request, Response, Streaming};
 
 use crate::{instance::InstanceParser, manager::Manager, Event, InstanceIdentifier, ProxyError};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Node {
     pub id: String,
     pub status: Status,
