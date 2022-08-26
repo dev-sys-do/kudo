@@ -1,5 +1,6 @@
 mod instance;
 mod instances;
+mod namespaces;
 mod output;
 mod resource;
 mod resources;
@@ -40,6 +41,9 @@ enum GetSubjects {
     /// instances
     Instances,
     Instance,
+
+    /// namespaces
+    Namespaces,
 }
 
 /// match the subcommand to get the correct info
@@ -52,5 +56,6 @@ pub async fn execute(args: GetSubcommand, conf: &config::Config) -> Result<Strin
         GetSubjects::Resource => resource::execute(conf, format, args.id).await,
         GetSubjects::Instances => instances::execute(conf, format, show_header).await,
         GetSubjects::Instance => instance::execute(conf, format, args.id).await,
+        GetSubjects::Namespaces => namespaces::execute(conf, format, show_header).await,
     }
 }
