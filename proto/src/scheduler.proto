@@ -37,9 +37,9 @@ message Port {
 }
 
 message ResourceSummary {
-    int32 cpu = 1;
-    int32 memory = 2;
-    int32 disk = 3;
+    uint64 cpu = 1;
+    uint64 memory = 2;
+    uint64 disk = 3;
 }
 
 message Resource {
