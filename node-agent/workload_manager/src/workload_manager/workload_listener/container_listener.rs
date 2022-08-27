@@ -4,7 +4,7 @@ use futures::StreamExt;
 
 use bollard::container::{CPUStats, StatsOptions};
 use bollard::errors::Error;
-use bollard::models::{ContainerStateStatusEnum, HealthStatusEnum};
+use bollard::models::ContainerStateStatusEnum;
 use bollard::Docker;
 
 use tokio::runtime::Runtime;
@@ -14,6 +14,8 @@ use proto::agent::{Instance, InstanceStatus, Resource, ResourceSummary, Status a
 
 use sysinfo::{System, SystemExt};
 use tokio::sync::mpsc::Sender;
+
+use log::{debug, info};
 
 fn convert_status(state: Option<ContainerStateStatusEnum>) -> WorkloadStatus {
     match state.unwrap_or(ContainerStateStatusEnum::RUNNING) {
@@ -57,10 +59,14 @@ impl ContainerListener {
         let container_data_result = docker_connection
             .inspect_container(container_id, None)
             .await;
+        debug!("inspected container");
+
         let container_resources_opt = docker_connection
             .stats(container_id, stats_options)
             .next()
             .await;
+        debug!("got stats stream");
+
 
         let container_resources = container_resources_opt
             .ok_or(|e: Error| e)
@@ -77,9 +83,7 @@ impl ContainerListener {
 
         let container_data = container_data_result.map_err(|e| Status::internal(e.to_string()))?;
 
-        let container_health_opt = container_data.clone().state;
-
-        let mut workload_status = convert_status(
+        let workload_status = convert_status(
             container_data
                 .state
                 .ok_or_else(|| {
@@ -89,29 +93,6 @@ impl ContainerListener {
                     ))
                 })?
                 .status,
-        );
-
-        // In case we have a healthcheck in our container, we can override it with WorkloadStatus::Starting
-        // https://docs.rs/bollard/latest/bollard/models/struct.Health.html
-        workload_status = container_health_opt.map_or_else(
-            || workload_status,
-            |s| {
-                s.health.map_or_else(
-                    || workload_status,
-                    |h| {
-                        h.status.map_or_else(
-                            || workload_status,
-                            |health_enum| {
-                                if health_enum == HealthStatusEnum::STARTING {
-                                    WorkloadStatus::Starting
-                                } else {
-                                    workload_status
-                                }
-                            },
-                        )
-                    },
-                )
-            },
         );
 
         let cpu_usage_in_milli_cpu = ContainerListener::calculate_cpu_usage(
@@ -184,14 +165,26 @@ impl WorkloadListener for ContainerListener {
             let docker = Docker::connect_with_socket_defaults().unwrap();
             let rt = Runtime::new().unwrap();
 
+            let mut cached = InstanceStatus::default();
+            debug!("{:?}", cached);
+
             loop {
                 let new_instance_status = rt.block_on(ContainerListener::fetch_instance_status(
                     id.as_str(),
                     &instance,
                     &docker,
                 ));
+                debug!("finished fetching data");
+                debug!("{:?}", new_instance_status);
+
                 match new_instance_status {
                     Ok(instance_to_send) => {
+
+                        if cached == instance_to_send {
+                            continue;
+                        }
+                        cached = instance_to_send.clone();
+
                         let status: i32 = instance_to_send.status;
 
                         rt.block_on(sender.send(Ok(instance_to_send)))
@@ -200,24 +193,29 @@ impl WorkloadListener for ContainerListener {
                         if status == WorkloadStatus::Crashed as i32
                             || status == WorkloadStatus::Terminated as i32
                         {
+                            debug!("Listener is stopping because contained has crashed or terminated");
                             break;
                         }
                     }
                     Err(e) => {
                         rt.block_on(sender.send(Err(e))).unwrap();
+                        debug!("Error while fetching instance status, listener is stopping");
                         break;
                     }
                 };
             }
+            info!("Container listener stopped");
 
             Ok(())
         });
+
+        info!("Container listener up and running!");
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::WorkloadListener;
+    use crate::workload_manager::workload_listener::workload_listener::WorkloadListener;
     use bollard::service::HealthConfig;
     use bollard::{container::Config, image::CreateImageOptions, Docker};
     use futures::TryStreamExt;
@@ -393,7 +391,7 @@ mod tests {
         let (tx, mut rx) = channel(1000);
 
         //test
-        super::ContainerListener::run(container.clone().id, instance, tx.clone());
+        crate::workload_manager::workload_listener::ContainerListener::run(container.clone().id, instance, tx.clone());
 
         loop {
             let msg = rx.recv().await;

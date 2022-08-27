@@ -31,7 +31,7 @@ impl WorkloadRunner {
         }
     }
 
-    /// run a workload based on the given instance definition
+    /// run a workload (container) based on the given instance definition
     ///
     /// The `run` function is the entry point for the `Workload` trait. It is the function that is
     /// called when a user wants to run a workload
@@ -42,8 +42,8 @@ impl WorkloadRunner {
     ///
     /// Returns:
     ///
-    /// A future that resolves to a Workload.
-    pub async fn run(&self, instance: Instance) -> Result<impl Workload> {
+    /// A future that resolves to a Container.
+    pub async fn run(&self, instance: Instance) -> Result<Container> {
         match instance.r#type() {
             Type::Container => Container::new(instance, &self.network_settings).await,
         }
