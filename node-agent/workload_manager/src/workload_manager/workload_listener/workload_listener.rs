@@ -1,5 +1,6 @@
 use proto::agent::{Instance, InstanceStatus};
-use std::sync::mpsc::Sender;
+use tokio::sync::mpsc::Sender;
+use tonic::Status;
 
 pub trait WorkloadListener {
     /// Launch a thread that will listen to a workload and send continously an InstanceStatus
@@ -9,5 +10,5 @@ pub trait WorkloadListener {
     /// * `id` - A String that is used by the workload's engine to identify it (docker containers' id for instance)
     /// * `instance` - An Instance struct, given by the scheduler,
     /// * `sender` - A sender given by the WorkloadManager, whose receiver is given to the scheduler
-    fn new(id: String, instance: Instance, sender: Sender<InstanceStatus>) -> Self;
+    fn run(id: String, instance: Instance, sender: Sender<Result<InstanceStatus, Status>>);
 }
