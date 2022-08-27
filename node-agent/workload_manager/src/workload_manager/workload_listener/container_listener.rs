@@ -1,8 +1,9 @@
-use crate::workload_manager::workload_listener::listener::WorkloadListener;
+use crate::workload_manager::workload_listener::workload_listener::WorkloadListener;
 
 use futures::StreamExt;
 
 use bollard::container::{CPUStats, StatsOptions};
+use bollard::errors::Error;
 use bollard::models::{ContainerStateStatusEnum, HealthStatusEnum};
 use bollard::Docker;
 
@@ -11,8 +12,18 @@ use tonic::Status;
 
 use proto::agent::{Instance, InstanceStatus, Resource, ResourceSummary, Status as WorkloadStatus};
 
-use std::sync::mpsc::Sender;
 use sysinfo::{System, SystemExt};
+use tokio::sync::mpsc::Sender;
+
+fn convert_status(state: Option<ContainerStateStatusEnum>) -> WorkloadStatus {
+    match state.unwrap_or(ContainerStateStatusEnum::RUNNING) {
+        ContainerStateStatusEnum::RUNNING => WorkloadStatus::Running,
+        ContainerStateStatusEnum::REMOVING => WorkloadStatus::Destroying,
+        ContainerStateStatusEnum::EXITED => WorkloadStatus::Terminated,
+        ContainerStateStatusEnum::DEAD => WorkloadStatus::Crashed,
+        _ => WorkloadStatus::Running,
+    }
+}
 
 #[derive(Clone)]
 pub struct ContainerListener {}
@@ -51,69 +62,57 @@ impl ContainerListener {
             .next()
             .await;
 
-        if container_resources_opt.is_none() {
-            return Err(Status::internal(format!(
-                "Cannot poll stats from workload {} (container {}) ",
-                instance.id, container_id
-            )));
-        };
+        let container_resources = container_resources_opt
+            .ok_or(|e: Error| e)
+            .map_err(
+                //At this point we have a Result<Result<Stats, Error>, Error> so we use map_er two times
+                |_e| {
+                    Status::internal(format!(
+                        "Cannot get state of workload {} (container {}) ",
+                        instance.id, container_id
+                    ))
+                },
+            )?
+            .map_err(|e| Status::internal(e.to_string()))?;
 
-        let container_resources_result = container_resources_opt.unwrap();
-
-        let container_resources = match container_resources_result {
-            Ok(res) => res,
-            Err(e) => return Err(Status::internal(e.to_string())),
-        };
-
-        let container_data = match container_data_result {
-            Ok(res) => res,
-            Err(e) => return Err(Status::internal(e.to_string())),
-        };
+        let container_data = container_data_result.map_err(|e| Status::internal(e.to_string()))?;
 
         let container_health_opt = container_data.clone().state;
 
-        let mut workload_status = match container_data.state {
-            Some(state) => match state.status {
-                Some(container_status) => match container_status {
-                    ContainerStateStatusEnum::RUNNING => WorkloadStatus::Running,
-                    ContainerStateStatusEnum::REMOVING => WorkloadStatus::Destroying,
-                    ContainerStateStatusEnum::EXITED => WorkloadStatus::Terminated,
-                    ContainerStateStatusEnum::DEAD => WorkloadStatus::Crashed,
-                    _ => WorkloadStatus::Running,
-                },
-                None => {
-                    return Err(Status::internal(format!(
-                        "Cannot get status of workload {} (container {}) ",
+        let mut workload_status = convert_status(
+            container_data
+                .state
+                .ok_or_else(|| {
+                    Status::internal(format!(
+                        "Cannot get state of workload {} (container {}) ",
                         instance.id, container_id
-                    )))
-                }
-            },
-            None => {
-                return Err(Status::internal(format!(
-                    "Cannot get state of workload {} (container {}) ",
-                    instance.id, container_id
-                )))
-            }
-        };
+                    ))
+                })?
+                .status,
+        );
 
         // In case we have a healthcheck in our container, we can override it with WorkloadStatus::Starting
         // https://docs.rs/bollard/latest/bollard/models/struct.Health.html
-        workload_status = match container_health_opt {
-            Some(s) => match s.health {
-                Some(h) => match h.status {
-                    Some(health_enum) => {
-                        if health_enum == HealthStatusEnum::STARTING {
-                            WorkloadStatus::Starting
-                        } else {
-                            workload_status
-                        }
-                    }
-                    None => workload_status,
-                },
-                None => workload_status,
+        workload_status = container_health_opt.map_or_else(
+            || workload_status,
+            |s| {
+                s.health.map_or_else(
+                    || workload_status,
+                    |h| {
+                        h.status.map_or_else(
+                            || workload_status,
+                            |health_enum| {
+                                if health_enum == HealthStatusEnum::STARTING {
+                                    WorkloadStatus::Starting
+                                } else {
+                                    workload_status
+                                }
+                            },
+                        )
+                    },
+                )
             },
-            None => workload_status,
-        };
+        );
 
         let cpu_usage_in_milli_cpu = ContainerListener::calculate_cpu_usage(
             container_resources.cpu_stats,
@@ -132,11 +131,11 @@ impl ContainerListener {
                 }),
                 usage: Some(ResourceSummary {
                     cpu: cpu_usage_in_milli_cpu,
-                    memory: container_resources.memory_stats.usage.unwrap_or(0) as i32,
+                    memory: container_resources.memory_stats.usage.unwrap_or(0),
                     disk: container_resources
                         .storage_stats
                         .read_count_normalized
-                        .unwrap_or(0) as i32,
+                        .unwrap_or(0),
                 }),
             }),
         })
@@ -148,7 +147,7 @@ impl ContainerListener {
     ///
     /// * `cpu` - cpu usage
     /// * `pre_cpu` - pre_cpu usage
-    fn calculate_cpu_usage(cpu: CPUStats, pre_cpu: CPUStats) -> i32 {
+    fn calculate_cpu_usage(cpu: CPUStats, pre_cpu: CPUStats) -> u64 {
         let mut sys = System::new_all();
         sys.refresh_all();
         let cpu_cores_number = match sys.physical_core_count() {
@@ -174,13 +173,13 @@ impl ContainerListener {
             0
         };
 
-        (total_mulli_cpu * cpu_percentage) as i32
+        total_mulli_cpu * cpu_percentage
     }
 }
 
 impl WorkloadListener for ContainerListener {
-    fn new(id: String, instance: Instance, sender: Sender<InstanceStatus>) -> Self {
-        std::thread::spawn(move || {
+    fn run(id: String, instance: Instance, sender: Sender<Result<InstanceStatus, Status>>) {
+        std::thread::spawn(move || -> Result<(), Status> {
             #[cfg(unix)]
             let docker = Docker::connect_with_socket_defaults().unwrap();
             let rt = Runtime::new().unwrap();
@@ -195,7 +194,8 @@ impl WorkloadListener for ContainerListener {
                     Ok(instance_to_send) => {
                         let status: i32 = instance_to_send.status;
 
-                        sender.send(instance_to_send).unwrap();
+                        rt.block_on(sender.send(Ok(instance_to_send)))
+                            .map_err(|e| Status::internal(e.to_string()))?;
 
                         if status == WorkloadStatus::Crashed as i32
                             || status == WorkloadStatus::Terminated as i32
@@ -203,14 +203,15 @@ impl WorkloadListener for ContainerListener {
                             break;
                         }
                     }
-                    Err(_e) => break,
+                    Err(e) => {
+                        rt.block_on(sender.send(Err(e))).unwrap();
+                        break;
+                    }
                 };
             }
 
-            drop(sender);
+            Ok(())
         });
-
-        Self {}
     }
 }
 
@@ -222,7 +223,7 @@ mod tests {
     use futures::TryStreamExt;
     use proto::agent::Status as WorkloadStatus;
     use proto::agent::{Instance, Port, Resource, ResourceSummary, Status, Type as IType};
-    use std::sync::mpsc::channel;
+    use tokio::sync::mpsc::channel;
 
     #[tokio::test]
     async fn test_fetch() -> Result<(), Status> {
@@ -284,9 +285,9 @@ mod tests {
             environment: vec!["A=0".to_string()],
             resource: Some(Resource {
                 limit: Some(ResourceSummary {
-                    cpu: i32::MAX,
-                    memory: i32::MAX,
-                    disk: i32::MAX,
+                    cpu: u64::MAX,
+                    memory: u64::MAX,
+                    disk: u64::MAX,
                 }),
                 usage: Some(ResourceSummary {
                     cpu: 0,
@@ -319,7 +320,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(res.id, instance.id);
-        assert!(res.resource.unwrap().usage.unwrap().cpu >= 0);
+        assert!(res.resource.unwrap().usage.unwrap().cpu < u64::MAX);
 
         Ok(())
     }
@@ -372,9 +373,9 @@ mod tests {
             environment: vec!["A=0".to_string()],
             resource: Some(Resource {
                 limit: Some(ResourceSummary {
-                    cpu: i32::MAX,
-                    memory: i32::MAX,
-                    disk: i32::MAX,
+                    cpu: u64::MAX,
+                    memory: u64::MAX,
+                    disk: u64::MAX,
                 }),
                 usage: Some(ResourceSummary {
                     cpu: 0,
@@ -389,27 +390,23 @@ mod tests {
             ip: "127.0.0.1".to_string(),
         };
 
-        let (tx, rx) = channel();
+        let (tx, mut rx) = channel(1000);
 
         //test
-        super::ContainerListener::new(container.clone().id, instance, tx.clone());
+        super::ContainerListener::run(container.clone().id, instance, tx.clone());
 
         loop {
-            let msg = rx.recv();
+            let msg = rx.recv().await;
 
-            if msg.is_err() {
-                break;
-            }
-
-            let received = msg.unwrap();
+            let received = msg.unwrap().unwrap();
             let status = received.status as i32;
             let received2 = received.clone();
             let received3 = received.clone();
 
             println!("{:?}", received);
 
-            assert_eq!(received.resource.unwrap().limit.unwrap().cpu, i32::MAX);
-            assert!(received2.resource.unwrap().usage.unwrap().cpu >= 0);
+            assert_eq!(received.resource.unwrap().limit.unwrap().cpu, u64::MAX);
+            assert!(received2.resource.unwrap().usage.unwrap().cpu < u64::MAX);
             assert!(received3.status as i32 <= 8);
 
             if status == WorkloadStatus::Crashed as i32
