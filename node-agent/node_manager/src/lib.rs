@@ -13,7 +13,7 @@ pub struct NodeSystem {
 impl NodeSystem {
     // used in all functions to access system
     pub fn new() -> Self {
-        let mut sys = System::new_all();
+        let sys = System::new_all();
 
         NodeSystem { sys }
     }
@@ -148,37 +148,37 @@ mod tests {
 
     #[test]
     fn test_total_cpu() {
-        let mut sys = init_system();
+        let mut node_system = init_system();
 
-        assert!(sys.total_cpu() >= 1000) // minimum 1 core
+        assert!(node_system.total_cpu() >= 1000) // minimum 1 core
     }
 
     #[test]
     fn test_used_cpu() {
-        let mut sys = init_system();
+        let mut node_system = init_system();
 
-        let total_cpu = sys.total_cpu();
-        let used_cpu = sys.used_cpu();
+        let total_cpu = node_system.total_cpu();
+        let used_cpu = node_system.used_cpu();
 
         assert!(used_cpu <= total_cpu)
     }
 
     #[test]
     fn test_used_memory() {
-        let mut sys = init_system();
+        let mut node_system = init_system();
 
-        let total_memory = sys.total_memory();
-        let used_memory = sys.used_memory();
+        let total_memory = node_system.total_memory();
+        let used_memory = node_system.used_memory();
 
         assert!(used_memory <= total_memory)
     }
 
     #[test]
     fn test_used_disk() {
-        let mut sys = init_system();
+        let mut node_system = init_system();
 
-        let total_disk = sys.total_disk();
-        let used_disk = sys.used_disk();
+        let total_disk = node_system.total_disk();
+        let used_disk = node_system.used_disk();
 
         assert!(used_disk <= total_disk)
     }

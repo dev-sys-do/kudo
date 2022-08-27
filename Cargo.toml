@@ -3,6 +3,7 @@
 members = [
     "controller",
     "node-agent",
+    "node-agent/node_manager",
     "network",
     "kudoctl",
     "scheduler",
