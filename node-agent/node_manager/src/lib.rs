@@ -10,6 +10,12 @@ pub struct NodeSystem {
     sys: System,
 }
 
+impl Default for NodeSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl NodeSystem {
     // used in all functions to access system
     pub fn new() -> Self {
@@ -101,7 +107,7 @@ impl NodeSystem {
             }
         }
 
-        main_disk_total_space = main_disk_total_space / BIT_TO_GB;
+        main_disk_total_space /= BIT_TO_GB;
 
         debug!("total disk space: {} GB", main_disk_total_space);
 
