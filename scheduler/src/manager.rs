@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::Result;
 use log::{debug, info};
 use proto::scheduler::{
     instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
@@ -9,20 +10,17 @@ use tokio::sync::mpsc;
 use tokio::{sync::oneshot, task::JoinHandle};
 use tonic::{transport::Server, Response};
 
+use crate::SchedulerError;
 use crate::{
-    instance_listener::InstanceListener, node_listener::NodeListener, storage::Storage, Event, Node,
+    config::Config, instance_listener::InstanceListener, node_listener::NodeListener,
+    storage::Storage, Event, Node,
 };
 
 #[derive(Debug)]
 pub struct Manager {
     instances: Arc<Storage<Instance>>,
     nodes: Arc<Storage<Node>>,
-}
-
-impl Default for Manager {
-    fn default() -> Self {
-        Self::new()
-    }
+    config: Arc<Config>,
 }
 
 impl Manager {
@@ -31,10 +29,11 @@ impl Manager {
     /// Returns:
     ///
     /// A new Manager struct
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         Manager {
             instances: Arc::new(Storage::new()),
             nodes: Arc::new(Storage::new()),
+            config: Arc::new(config),
         }
     }
 
@@ -66,9 +65,11 @@ impl Manager {
     /// Returns:
     ///
     /// A JoinHandle<()>
-    fn create_grpc_server(&self, tx: mpsc::Sender<Event>) -> JoinHandle<()> {
+    fn create_grpc_server(&self, tx: mpsc::Sender<Event>) -> Result<JoinHandle<()>> {
         info!("creating grpc server ...");
-        let addr = "127.0.0.1:50051".parse().unwrap();
+        let addr = format!("{}:{}", self.config.host, self.config.port)
+            .parse()
+            .map_err(|_| SchedulerError::InvalidGrpcAddress)?;
 
         let node_listener = NodeListener::new(tx.clone());
         debug!("create node listener with data : {:?}", node_listener);
@@ -79,7 +80,7 @@ impl Manager {
             instance_listener
         );
 
-        tokio::spawn(async move {
+        Ok(tokio::spawn(async move {
             info!("started grpc server at {}", addr);
 
             Server::builder()
@@ -88,7 +89,7 @@ impl Manager {
                 .serve(addr)
                 .await
                 .unwrap();
-        })
+        }))
     }
 
     /// Create a multi-producer, single-consumer channel with a buffer size of 32
@@ -170,7 +171,7 @@ impl Manager {
         let (tx, rx) = Self::create_mpsc_channel();
 
         // create listeners and serve the grpc server
-        handlers.push(self.create_grpc_server(tx));
+        handlers.push(self.create_grpc_server(tx)?);
 
         // listen for incoming events and pass them to the orchestrator
         handlers.push(self.listen_events(rx));
