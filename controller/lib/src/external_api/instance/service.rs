@@ -135,7 +135,7 @@ impl InstanceService {
     ///
     /// * `this`: the method is called on the `this` object. Used to handle threads.
     /// * `instance`: The instance to schedule
-    fn schedule_instance(this: Arc<Mutex<Self>>, mut instance: Instance) {
+    pub fn schedule_instance(this: Arc<Mutex<Self>>, mut instance: Instance) {
         //Spawn a thread to start the instance
         tokio::spawn(async move {
             loop {
