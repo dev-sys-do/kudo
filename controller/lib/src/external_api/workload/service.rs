@@ -5,8 +5,13 @@ use super::model::{Ressources, Type, Workload, WorkloadDTO, WorkloadError, Workl
 use crate::etcd::EtcdClient;
 use serde_json;
 
+/// `WorkloadService` is a struct that inpired from Controllers Provider Modules architectures. It can be used as a service in the WorkloadController .A service can use other services.
+/// Properties:
+///
+/// * `etcd_service`: This is the service that will be used to interact with etcd.
+/// * `filter_service`: This is the service that will be used to filter the workloads.
 pub struct WorkloadService {
-    etcd_service: EtcdInterface,
+    etcd_service: EtcdClient,
     filter_service: FilterService,
 }
 
@@ -31,7 +36,7 @@ impl WorkloadService {
                 let workload: Workload = serde_json::from_str(&workload)
                     .map_err(|err| WorkloadError::JsonToWorkload(err.to_string()))?;
                 if workload.namespace == namespace {
-                    Ok(serde_json::to_string(&workload).unwrap())
+                    Ok(workload)
                 } else {
                     Err(WorkloadError::WorkloadNotFound)
                 }
@@ -40,6 +45,17 @@ impl WorkloadService {
         }
     }
 
+    /// This function gets all the workloads from etcd, filters them by namespace and slice the result by limit and offset
+    /// If there is an error , the function always return an empty vector
+    /// # Arguments:
+    ///
+    /// * `limit`: The number of workloads to return.
+    /// * `offset`: The offset of the workloads to be returned.
+    /// * `namespace`: The namespace to filter by.
+    ///
+    /// # Returns:
+    ///
+    /// A vector of workloads
     pub async fn get_all_workloads(
         &mut self,
         limit: u32,
@@ -72,6 +88,16 @@ impl WorkloadService {
         }
     }
 
+    /// It creates a new workload in etcd
+    ///
+    /// # Arguments:
+    ///
+    /// * `workload_dto`: WorkloadDTO containt the workload data
+    /// * `namespace`: The namespace of the workload
+    ///
+    /// # Returns:
+    ///
+    /// A workload.
     pub async fn create_workload(
         &mut self,
         workload_dto: WorkloadDTO,
@@ -109,6 +135,17 @@ impl WorkloadService {
         }
     }
 
+    /// It updates a workload in the etcd
+    ///
+    /// # Arguments:
+    ///
+    /// * `workload_dto`: WorkloadDTO
+    /// * `workload_id`: The id of the workload to update
+    /// * `namespace`: The namespace of the workload
+    ///
+    /// # Returns:
+    ///
+    /// A Result<String, WorkloadError>
     pub async fn update_workload(
         &mut self,
         workload_dto: WorkloadDTO,
