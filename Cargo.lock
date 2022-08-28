@@ -1630,9 +1630,14 @@ dependencies = [
 name = "scheduler"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "confy",
  "env_logger 0.8.4",
  "log",
  "proto",
+ "serde",
+ "serde_derive",
+ "thiserror",
  "tokio",
  "tokio-stream",
  "tonic",
