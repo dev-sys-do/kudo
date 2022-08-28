@@ -551,6 +551,7 @@ dependencies = [
  "log",
  "proto",
  "serde",
+ "serde_json",
  "tokio",
  "tonic",
 ]
