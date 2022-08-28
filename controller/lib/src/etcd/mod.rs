@@ -52,9 +52,8 @@ impl EtcdClient {
                     values.push(value.to_string());
                 }
             }
-            Some(values)
-        });
-        None
+            values
+        })
     }
 }
 /*
