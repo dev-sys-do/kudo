@@ -13,7 +13,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let config: config::KudoControllerConfig = confy::load_path("controller.conf")?;
 
     // gRPC Server
-    internal_api::interface::InternalAPIInterface::new(config.internal_api.grpc_server_addr).await;
+    internal_api::interface::InternalAPIInterface::new(
+        config.internal_api.grpc_server_addr,
+        config.external_api.etcd_address,
+        config.internal_api.grpc_client_addr.clone(),
+    );
 
     // HTTP Server
     external_api::interface::ExternalAPIInterface::new(

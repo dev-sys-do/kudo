@@ -1,6 +1,10 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_build::configure()
         .type_attribute(
+            "controller.NodeState",
+            "#[derive(serde::Deserialize, serde::Serialize)]",
+        )
+        .type_attribute(
             "controller.InstanceState",
             "#[derive(serde::Deserialize, serde::Serialize)]",
         )
