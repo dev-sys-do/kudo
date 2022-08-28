@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use log::{error, info};
 use proto::scheduler::instance_service_client::InstanceServiceClient;
 use proto::scheduler::{Instance, InstanceIdentifier, InstanceStatus};
@@ -8,6 +10,19 @@ use tonic::{Request, Response, Status, Streaming};
 pub enum SchedulerClientInterfaceError {
     ConnectionError(Error),
     RequestFailed(Status),
+}
+
+impl Display for SchedulerClientInterfaceError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SchedulerClientInterfaceError::ConnectionError(error) => {
+                write!(f, "Connection error: {}", error)
+            }
+            SchedulerClientInterfaceError::RequestFailed(status) => {
+                write!(f, "Request failed: {}", status)
+            }
+        }
+    }
 }
 
 pub struct SchedulerClientInterface {
