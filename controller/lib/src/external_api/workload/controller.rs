@@ -1,5 +1,4 @@
-use super::{model::WorkloadInfo, service};
-use actix_web::{delete, get, patch, put, web, HttpResponse, Responder, Scope};
+use crate::external_api::interface::ActixAppState;
 
 use super::service::WorkloadService;
 use super::{model::Pagination, model::WorkloadDTO};
@@ -22,6 +21,17 @@ impl WorkloadController {
             )
     }
 
+    /// It gets a workload from etcd, and if it exists, check if the namespace is the same.
+    ///
+    /// # Arguments:
+    ///
+    /// * `workload_id`: The workload id to get
+    /// * `namespace`: The namespace of the workload
+    ///
+    /// # Returns:
+    ///
+    /// A Result<String, WorkloadError>
+
     pub async fn workload(
         params: web::Path<(String, String)>,
         data: web::Data<ActixAppState>,
@@ -39,6 +49,14 @@ impl WorkloadController {
             .map_or_else(|e| e.to_http(), |w| w.to_http())
     }
 
+    /// `put_workload` is an async function that handle **/workload/\<namespace>** route (PUT)
+    /// # Description:
+    /// * Create a new workload
+    /// # Arguments:
+    ///
+    /// * `namespace`: web::Path<String> - This is the namespace that the workload will be created in.
+    /// * `body`: web::Json<WorkloadDTO> - Contain all information required to create the workload.
+
     pub async fn put_workload(
         namespace: web::Path<String>,
         body: web::Json<WorkloadDTO>,
@@ -55,6 +73,13 @@ impl WorkloadController {
             .map_or_else(|e| e.to_http(), |w| w.to_http())
     }
 
+    /// `get_all_workloads` is an async function that handle **/workload/\<namespace>** route (GET)
+    /// # Description:
+    /// * Get all workload in the namespace
+    /// # Arguments:
+    ///
+    /// * `namespace`: The namespace of the workloads you want to retrieve.
+    /// * `pagination`: Option<web::Query<Pagination>>
 
     pub async fn get_all_workloads(
         namespace: web::Path<String>,
@@ -80,6 +105,14 @@ impl WorkloadController {
         }
     }
 
+    /// `patch_workload` is an asynchronous function that handle **/workload/\<namespace>/<workload_id>** route (PATCH)
+    /// # Description:
+    /// * Update a workload
+    /// # Arguments:
+    ///
+    /// * `params`: web::Path<(String, String)> - The first Path parameter is the namespace and the second the workload id.
+    /// * `body`: web::Json<WorkloadDTO> - Contain all information required to create the workload.
+
     pub async fn patch_workload(
         params: web::Path<(String, String)>,
         body: web::Json<WorkloadDTO>,
@@ -98,6 +131,17 @@ impl WorkloadController {
             .await
             .map_or_else(|e| e.to_http(), |w| w.to_http())
     }
+
+    /// It deletes a workload from etcd
+    ///
+    /// # Arguments:
+    ///
+    /// * `id`: The id of the workload to delete
+    /// * `namespace`: The namespace of the workload
+    ///
+    /// # Returns:
+    ///
+    /// A Result<(), WorkloadError>
 
     pub async fn delete_workload(
         params: web::Path<(String, String)>,
