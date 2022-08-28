@@ -19,6 +19,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     external_api::interface::ExternalAPIInterface::new(
         config.external_api.http_server_addr,
         config.external_api.http_server_num_workers,
+        config.external_api.etcd_address,
     )
     .await;
 

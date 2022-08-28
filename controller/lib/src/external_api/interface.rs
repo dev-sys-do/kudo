@@ -6,8 +6,12 @@ use std::net::SocketAddr;
 
 pub struct ExternalAPIInterface {}
 
+pub struct ActixAppState {
+    pub etcd_address: SocketAddr,
+}
+
 impl ExternalAPIInterface {
-    pub async fn new(address: SocketAddr, num_workers: usize) -> Self {
+    pub async fn new(address: SocketAddr, num_workers: usize, etcd_address: SocketAddr) -> Self {
         info!(
             "Starting {} HTTP worker(s) listening on {}",
             num_workers, address
@@ -15,8 +19,9 @@ impl ExternalAPIInterface {
 
         HttpServer::new(move || {
             App::new()
+                .app_data(web::Data::new(ActixAppState { etcd_address }))
                 .route("/health", web::get().to(HttpResponse::Ok))
-                .service(workload::controller::get_services())
+                .service(workload::controller::WorkloadController {}.services())
                 .wrap(Logger::default())
         })
         .workers(num_workers)
