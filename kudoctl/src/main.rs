@@ -56,10 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         global_config.controller_url = host.to_string();
     }
 
-    // Set namespace if defined
-    if let Some(namespace) = cli.namespace {
-        global_config.namespace = namespace;
-    }
+    global_config.namespace = cli.namespace.unwrap_or_else(|| "default".to_string());
 
     subcommands::match_subcommand(cli.command, &global_config).await;
 
