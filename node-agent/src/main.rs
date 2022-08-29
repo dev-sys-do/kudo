@@ -9,6 +9,7 @@ use cidr::Ipv4Inet;
 use log::{debug, info, trace};
 use network::node::request::SetupNodeRequest;
 use tokio::time;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{transport::Server, Request, Response, Status};
 use uuid::Uuid;
 
@@ -17,13 +18,81 @@ mod config;
 use config::{GrpcServerConfig, NodeAgentConfig};
 use network::node::setup_node;
 use node_manager::NodeSystem;
+use workload_manager::workload_manager::WorkloadManager;
 
+use proto::agent::{
+    instance_service_server::InstanceService, instance_service_server::InstanceServiceServer,
+    Instance, InstanceStatus, SignalInstruction,
+};
 use proto::scheduler::{
     node_service_client::NodeServiceClient, NodeRegisterRequest, NodeRegisterResponse, NodeStatus,
     Resource, ResourceSummary, Status as SchedulerStatus,
 };
 
 const NUMBER_OF_CONNECTION_ATTEMPTS: u16 = 10;
+
+///
+/// This Struct implement the Instance service from Node Agent proto file
+///
+#[derive(Debug)]
+pub struct InstanceServiceController {
+    workload_manager: WorkloadManager,
+}
+
+impl InstanceServiceController {
+    pub fn new(node_id: String) -> Self {
+        Self {
+            workload_manager: WorkloadManager::new(node_id),
+        }
+    }
+}
+
+#[tonic::async_trait]
+impl InstanceService for InstanceServiceController {
+    type createStream = ReceiverStream<Result<InstanceStatus, Status>>;
+
+    async fn create(
+        &self,
+        request: Request<Instance>,
+    ) -> Result<Response<Self::createStream>, Status> {
+        let instance = request.into_inner();
+        // let receiver = self.workload_manager.create(instance).await?;
+        let receiver = self.workload_manager.create(instance).await;
+
+        Ok(Response::new(ReceiverStream::new(receiver)))
+    }
+
+    async fn signal(&self, request: Request<SignalInstruction>) -> Result<Response<()>, Status> {
+        let signal_instruction = request.into_inner();
+
+        Ok(Response::new(
+            self.workload_manager.signal(signal_instruction).await?,
+        ))
+    }
+}
+
+///
+/// This function starts the grpc server of the Node Agent.
+/// The server listens and responds to requests from the Scheduler.
+/// The default port is 50053.
+///
+fn create_grpc_server(config: GrpcServerConfig, node_id: String) -> tokio::task::JoinHandle<()> {
+    let addr = format!("http://{}:{}", config.host, config.port)
+        .parse()
+        .unwrap();
+    let instance_service_controller = InstanceServiceController::new(node_id);
+
+    info!("Node Agent server listening on {}", addr);
+
+    tokio::spawn(async move {
+        Server::builder()
+            .add_service(InstanceServiceServer::new(instance_service_controller))
+            .serve(addr)
+            .await
+            .unwrap()
+    })
+}
+
 ///
 /// This function allows you to connect to the scheduler's grpc server.
 ///
@@ -183,6 +252,7 @@ fn create_grpc_client(config: GrpcServerConfig, node_id: String) -> tokio::task:
         }
     })
 }
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
@@ -205,8 +275,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // start grpc server and client
     let client_handler = create_grpc_client(config.client, node_id.clone());
+    let server_handler = create_grpc_server(config.server, node_id.clone());
 
     client_handler.await?;
+    server_handler.await?;
 
     info!("Shutting down node agent");
 
