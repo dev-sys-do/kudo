@@ -7,7 +7,7 @@ use tokio::sync::{mpsc, oneshot};
 use tonic::Response;
 
 pub mod config;
-pub mod instance_listener;
+pub mod instance;
 pub mod manager;
 pub mod node_listener;
 pub mod storage;
@@ -26,6 +26,12 @@ pub enum SchedulerError {
     Unknown,
 }
 
+#[derive(Error, Debug)]
+pub enum ProxyError {
+    #[error("an error occurred while sending a message to the channel")]
+    ChannelSenderError,
+}
+
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Node {
@@ -33,6 +39,7 @@ pub struct Node {
 }
 
 pub type NodeIdentifier = String;
+pub type InstanceIdentifier = String;
 
 #[derive(Debug)]
 pub enum Event {
