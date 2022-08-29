@@ -30,9 +30,11 @@ pub async fn match_subcommand(command: Subcommands, conf: &config::Config) {
             if !result.is_empty() {
                 println!("{}", result);
             }
+            std::process::exit(0);
         }
         Err(err) => {
             error!("{}", err);
+            std::process::exit(1);
         }
     }
 }
