@@ -13,9 +13,10 @@ use tokio::sync::{mpsc, Mutex};
 use tonic::{Request, Response, Streaming};
 
 use crate::{
+    event::Event,
     manager::Manager,
     parser::{InstanceParser, ResourceParser},
-    Event, InstanceIdentifier, ProxyError,
+    InstanceIdentifier, ProxyError,
 };
 
 #[derive(Debug, Clone)]

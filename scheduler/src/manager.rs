@@ -7,19 +7,23 @@ use tokio::time;
 use log;
 use proto::scheduler::{
     instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
-    InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse, Status,
 };
 use tokio::sync::{mpsc, oneshot};
 use tokio::{sync::Mutex, task::JoinHandle};
-use tonic::{transport::Server, Response};
-use uuid::Uuid;
+use tonic::transport::Server;
 
-use crate::node::Node;
+use crate::event::handlers::instance_create::InstanceCreateHandler;
+use crate::event::handlers::instance_destroy::InstanceDestroyHandler;
+use crate::event::handlers::instance_stop::InstanceStopHandler;
+use crate::event::handlers::node_register::NodeRegisterHandler;
+use crate::event::handlers::node_status::NodeStatusHandler;
+use crate::event::handlers::node_unregister::NodeUnregisterHandler;
+use crate::event::Event;
 use crate::ManagerError;
 use crate::SchedulerError;
 use crate::{
     config::Config, instance::InstanceListener, node::NodeListener, orchestrator::Orchestrator,
-    storage::Storage, Event,
+    storage::Storage,
 };
 
 #[derive(Debug)]
@@ -125,195 +129,33 @@ impl Manager {
                 match event {
                     Event::InstanceCreate(instance, tx) => {
                         log::trace!("received instance create event : {:?}", instance);
-                        log::info!("scheduling a new instance {:?} ...", instance.id);
-
-                        match orchestrator
-                            .lock()
-                            .await
-                            .create_instance(instance.clone(), tx.clone())
-                            .await
-                        {
-                            Ok(_) => {
-                                // todo: proxy the stream to the controller
-                            }
-                            Err(err) => {
-                                log::error!(
-                                    "error while scheduling instance : {:?} ({:?})",
-                                    instance.id,
-                                    err
-                                );
-
-                                let instance_status = InstanceStatus {
-                                    id: Uuid::new_v4().to_string(),
-                                    status: Status::Failed.into(),
-                                    status_description: format!(
-                                        "Error thrown by the orchestrator: {:?}",
-                                        err
-                                    ),
-                                    resource: None,
-                                };
-
-                                let _ = tx.send(Ok(instance_status)).await;
-                            }
-                        }
+                        InstanceCreateHandler::handle(orchestrator.clone(), instance, tx).await;
                     }
                     Event::InstanceStop(id, tx) => {
                         log::trace!("received instance stop event : {:?}", id);
-
-                        match orchestrator.lock().await.stop_instance(id.clone()).await {
-                            Ok(_) => {
-                                log::info!("stopped instance : {:?}", id);
-
-                                tx.send(Ok(Response::new(()))).unwrap();
-                            }
-                            Err(err) => {
-                                log::error!("error while stopping instance : {:?} ({:?})", id, err);
-
-                                tx.send(Err(tonic::Status::internal(format!(
-                                    "Error thrown by the orchestrator: {:?}",
-                                    err
-                                ))))
-                                .unwrap();
-                            }
-                        };
+                        InstanceStopHandler::handle(orchestrator.clone(), id, tx).await;
                     }
                     Event::InstanceDestroy(id, tx) => {
                         log::trace!("received instance destroy event : {:?}", id);
-
-                        match orchestrator.lock().await.destroy_instance(id.clone()).await {
-                            Ok(_) => {
-                                log::info!("destroyed instance : {:?}", id);
-
-                                tx.send(Ok(Response::new(()))).unwrap();
-                            }
-                            Err(err) => {
-                                log::error!(
-                                    "error while destroying instance : {:?} ({:?})",
-                                    id,
-                                    err
-                                );
-
-                                tx.send(Err(tonic::Status::internal(format!(
-                                    "Error thrown by the orchestrator: {:?}",
-                                    err
-                                ))))
-                                .unwrap();
-                            }
-                        };
+                        InstanceDestroyHandler::handle(orchestrator.clone(), id, tx).await;
                     }
                     Event::NodeRegister(request, addr, tx) => {
                         log::trace!("received node register event : {:?}", request);
-
-                        // todo: parse certificate and get the node information
-                        let node = Node {
-                            id: Uuid::new_v4().to_string(),
-                            status: Status::Starting,
-                            resource: None,
-                        };
-
-                        match orchestrator
-                            .lock()
-                            .await
-                            .register_node(node.clone(), addr, controller_client.clone())
-                            .await
-                        {
-                            Ok(_) => {
-                                log::info!("successfully registered node: {:?}", node.id);
-
-                                let response = NodeRegisterResponse {
-                                    code: 0,
-                                    description: "Welcome to the cluster".to_string(),
-                                    subnet: "".to_string(),
-                                };
-
-                                tx.send(Ok(tonic::Response::new(response))).unwrap();
-                            }
-                            Err(err) => {
-                                log::error!(
-                                    "error while registering node : {:?} ({:?})",
-                                    node.id,
-                                    err
-                                );
-
-                                let response = NodeRegisterResponse {
-                                    code: 1,
-                                    description: format!(
-                                        "Error thrown by the orchestrator: {:?}",
-                                        err
-                                    ),
-                                    subnet: "".to_string(),
-                                };
-
-                                tx.send(Ok(tonic::Response::new(response))).unwrap();
-                            }
-                        };
+                        NodeRegisterHandler::handle(
+                            orchestrator.clone(),
+                            addr,
+                            controller_client.clone(),
+                            tx,
+                        )
+                        .await;
                     }
                     Event::NodeUnregister(request, tx) => {
                         log::trace!("received node unregister event : {:?}", request);
-
-                        match orchestrator
-                            .lock()
-                            .await
-                            .unregister_node(request.id.clone())
-                        {
-                            Ok(_) => {
-                                log::info!("successfully unregistered node {:?}", request.id);
-
-                                let response = NodeUnregisterResponse {
-                                    code: 0,
-                                    description: "Bye from the cluster".to_string(),
-                                };
-
-                                tx.send(Ok(tonic::Response::new(response))).unwrap();
-                            }
-                            Err(err) => {
-                                log::error!(
-                                    "error while unregistering node : {:?} ({:?})",
-                                    request.id,
-                                    err
-                                );
-
-                                let response = NodeUnregisterResponse {
-                                    code: 1,
-                                    description: format!(
-                                        "Error thrown by the orchestrator: {:?}",
-                                        err
-                                    ),
-                                };
-
-                                tx.send(Ok(tonic::Response::new(response))).unwrap();
-                            }
-                        };
+                        NodeUnregisterHandler::handle(orchestrator.clone(), request.id, tx).await;
                     }
                     Event::NodeStatus(status, tx) => {
                         log::trace!("received node status event : {:?}", status);
-
-                        match orchestrator
-                            .lock()
-                            .await
-                            .update_node_status(status.id.clone(), status.clone())
-                            .await
-                        {
-                            Ok(_) => {
-                                log::debug!("successfully updated node status : {:?}", status.id);
-
-                                tx.send(Ok(())).await.unwrap();
-                            }
-                            Err(err) => {
-                                log::info!(
-                                    "error while updating node status : {:?} ({:?})",
-                                    status.id,
-                                    err
-                                );
-
-                                tx.send(Err(tonic::Status::internal(format!(
-                                    "Error thrown by the orchestrator: {:?}",
-                                    err
-                                ))))
-                                .await
-                                .unwrap();
-                            }
-                        };
+                        NodeStatusHandler::handle(orchestrator.clone(), status, tx).await;
                     }
                 }
             }

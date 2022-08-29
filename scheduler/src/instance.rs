@@ -9,7 +9,7 @@ use proto::scheduler::{
 };
 use uuid::Uuid;
 
-use crate::{manager::Manager, Event, NodeIdentifier, ProxyError};
+use crate::{event::Event, manager::Manager, NodeIdentifier, ProxyError};
 
 #[derive(Debug)]
 pub struct InstanceListener {
