@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use bollard::container::{
     Config, KillContainerOptions, RemoveContainerOptions, RenameContainerOptions,
     StopContainerOptions,
@@ -17,9 +19,7 @@ pub struct Container {
 }
 
 impl Container {
-    //
-    // Create a new workload (container) and start it
-    //
+    /// Create a new workload (container) and start it
     pub async fn new(instance: Instance) -> Result<Self, Error> {
         let docker =
             Docker::connect_with_socket_defaults().context("Can't connect to docker socket. ")?;
@@ -37,27 +37,7 @@ impl Container {
             .await
             .context("Can't create image. ")?;
 
-        let container_config: Config<&str> = Config {
-            image: Some(instance.uri.as_str()),
-            tty: Some(true),
-            ..Default::default()
-        };
-
-        let container_id = docker
-            .create_container::<&str, &str>(None, container_config)
-            .await
-            .context("Can't create container. ")?
-            .id;
-
-        docker
-            .rename_container(
-                container_id.as_str(),
-                RenameContainerOptions {
-                    name: instance.name,
-                },
-            )
-            .await
-            .ok();
+        let container_id = create_container(&docker, instance).await?;
 
         docker
             .start_container::<String>(container_id.as_str(), None)
@@ -67,9 +47,7 @@ impl Container {
         Ok(Container { id: container_id })
     }
 
-    //
-    // Removes a container
-    //
+    /// Removes a container
     async fn remove(&self) -> Result<(), Error> {
         let docker =
             Docker::connect_with_socket_defaults().context("Can't connect to docker socket. ")?;
@@ -94,9 +72,7 @@ impl Workload for Container {
         self.id.to_string()
     }
 
-    //
     // Gracefully stop a workload
-    //
     async fn stop(&self) -> Result<(), Error> {
         let docker =
             Docker::connect_with_socket_defaults().context("Can't connect to docker socket. ")?;
@@ -116,10 +92,8 @@ impl Workload for Container {
         Ok(())
     }
 
-    //
     // Force a workload to stop
     // (equivalent to a `kill -9` on linux)
-    //
     async fn kill(&self) -> Result<(), Error> {
         let docker =
             Docker::connect_with_socket_defaults().context("Can't connect to docker socket. ")?;
@@ -136,6 +110,66 @@ impl Workload for Container {
 
         Ok(())
     }
+}
+
+/// It creates a container with the given instance's configuration
+///
+/// Arguments:
+///
+/// * `docker`: &Docker - This is the docker client that we created earlier.
+/// * `instance`: Instance
+///
+/// Returns:
+///
+/// A string that is the container id.
+async fn create_container(docker: &Docker, instance: Instance) -> Result<String> {
+    let mut ports = HashMap::new();
+    let port_list = &instance.ports;
+    for port in port_list {
+        ports.insert(
+            port.destination.to_string(),
+            Some(vec![bollard::service::PortBinding {
+                host_port: Some(port.destination.to_string()),
+                ..Default::default()
+            }]),
+        );
+    }
+
+    let container_config: Config<&str> = Config {
+        image: Some(instance.uri.as_str()),
+        tty: Some(true),
+        host_config: Some(bollard::service::HostConfig {
+            port_bindings: Some(ports),
+            nano_cpus: instance
+                .resource
+                .clone()
+                .and_then(|resource| resource.limit.map(|limit| limit.cpu.try_into().unwrap())),
+            memory: instance
+                .resource
+                .clone()
+                .and_then(|resource| resource.limit.map(|limit| limit.memory.try_into().unwrap())),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    let container_id = docker
+        .create_container::<&str, &str>(None, container_config)
+        .await
+        .context("Can't create container. ")?
+        .id;
+
+    docker
+        .rename_container(
+            container_id.as_str(),
+            RenameContainerOptions {
+                name: instance.name,
+            },
+        )
+        .await
+        .ok();
+
+    Ok(container_id)
 }
 
 #[cfg(test)]
