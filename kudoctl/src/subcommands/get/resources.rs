@@ -1,6 +1,6 @@
 use crate::{
     client::{self, request::Client, workload::GetWorkloadResponse},
-    config, resource,
+    config,
 };
 use anyhow::{Context, Result};
 use std::fmt::Display;
@@ -26,11 +26,7 @@ impl Display for GetWorkloadResponse {
         }
 
         for r in &self.workloads {
-            match r {
-                resource::Resource::Workload(workload) => {
-                    writeln!(f, "{}\tWorkload\n", workload.name)?;
-                }
-            }
+            writeln!(f, "{}\tWorkload\n", r.name)?;
         }
         Ok(())
     }

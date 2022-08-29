@@ -13,7 +13,7 @@ pub struct Workload {
 }
 
 // Resources assigned to a workload
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Resources {
     // CPU in milliCPU
     pub cpu: u64,

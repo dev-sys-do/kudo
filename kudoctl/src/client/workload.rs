@@ -1,14 +1,31 @@
 use anyhow::{Context, Result};
-use log::debug;
+use log::{debug, warn};
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     client::types::IdResponse,
-    resource::{self, workload},
+    resource::workload::{self, Resources},
 };
 
 use super::request::{Client, RequestError};
+
+/// Ports binding for the workload
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PortBinding {
+    pub source: i32,
+    pub destination: i32,
+}
+
+/// Workload, as stored in the controller
+#[derive(Debug, Deserialize, Serialize)]
+pub struct WorkloadBody {
+    pub name: String,
+    pub uri: String,
+    pub environment: Vec<String>,
+    pub resources: Resources,
+    pub ports: Vec<PortBinding>,
+}
 
 /// Creates a workload in the cluster.
 ///
@@ -18,11 +35,46 @@ pub async fn create(
     namespace: &str,
     workload: &workload::Workload,
 ) -> std::result::Result<String, RequestError> {
+    let workload_body = WorkloadBody {
+        name: workload.name.clone(),
+        uri: workload.uri.clone(),
+        environment: workload.env.as_deref().unwrap_or_default().to_vec(),
+        resources: workload.resources.to_owned(),
+        ports: workload
+            .ports
+            .to_owned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| {
+                // parse the port binding from the string
+
+                let mut splitted = p.split(':');
+                let source = splitted.next().unwrap_or(&p).parse::<i32>().unwrap_or(0);
+
+                if source == 0 {
+                    warn!("Invalid port binding: {}", p);
+                }
+
+                let destination = if let Some(s) = splitted.nth(1) {
+                    debug!("No destination port specified, using source port");
+                    s.parse::<i32>().unwrap_or(source)
+                } else {
+                    source
+                };
+
+                PortBinding {
+                    source,
+                    destination,
+                }
+            })
+            .collect(),
+    };
+
     let response: IdResponse = (*client)
         .send_json_request(
             format!("/workload/{}", namespace).as_str(),
             Method::PUT,
-            Some(workload),
+            Some(&workload_body),
         )
         .await?;
     debug!("Workload {} created", response.id);
@@ -51,13 +103,9 @@ pub async fn update(
 /// Get info about a workload.
 ///
 /// Returns the workload info.
-pub async fn get(
-    client: &Client,
-    namespace: &str,
-    workload_id: &str,
-) -> Result<workload::Workload> {
-    let response: workload::Workload = (*client)
-        .send_json_request::<workload::Workload, ()>(
+pub async fn get(client: &Client, namespace: &str, workload_id: &str) -> Result<WorkloadBody> {
+    let response: WorkloadBody = (*client)
+        .send_json_request::<WorkloadBody, ()>(
             &format!("/workload/{}/{}", namespace, workload_id),
             Method::GET,
             None,
@@ -70,7 +118,7 @@ pub async fn get(
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetWorkloadResponse {
     pub count: u64,
-    pub workloads: Vec<resource::Resource>,
+    pub workloads: Vec<WorkloadBody>,
     #[serde(skip)]
     pub show_header: bool,
 }
