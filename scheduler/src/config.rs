@@ -10,8 +10,15 @@ use serde_derive::{Deserialize, Serialize};
 pub struct Config {
     pub host: String,
     pub port: u16,
+    pub controller: ControllerConfig,
 }
 
+/// `ControllerConfig` is a struct that contains the configuration of the controller.
+///
+/// Properties:
+///
+/// * `host`: The hostname or IP address of the controller.
+/// * `port`: The port that the controller will listen on.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ControllerConfig {
     pub host: String,
@@ -23,6 +30,10 @@ impl Default for Config {
         Config {
             host: "127.0.0.1".to_string(),
             port: 50052,
+            controller: ControllerConfig {
+                host: "127.0.0.1".to_string(),
+                port: 50051,
+            },
         }
     }
 }

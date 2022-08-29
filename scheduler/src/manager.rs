@@ -1,8 +1,8 @@
 use anyhow::Result;
+use proto::controller::node_service_client::NodeServiceClient;
 use std::sync::Arc;
 
-use anyhow::Result;
-use log::{debug, info};
+use log;
 use proto::scheduler::{
     instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
     InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse, Status,
@@ -12,6 +12,7 @@ use tokio::{sync::Mutex, task::JoinHandle};
 use tonic::{transport::Server, Response};
 use uuid::Uuid;
 
+use crate::node::Node;
 use crate::SchedulerError;
 use crate::{
     config::Config, instance::InstanceListener, node::NodeListener, orchestrator::Orchestrator,
@@ -57,7 +58,8 @@ impl Manager {
     ///
     /// A JoinHandle<()>
     fn create_grpc_server(&self, tx: mpsc::Sender<Event>) -> Result<JoinHandle<()>> {
-        info!("creating grpc server ...");
+        log::info!("creating grpc server ...");
+
         let addr = format!("{}:{}", self.config.host, self.config.port)
             .parse()
             .map_err(|_| SchedulerError::InvalidGrpcAddress)?;
@@ -72,7 +74,7 @@ impl Manager {
         );
 
         Ok(tokio::spawn(async move {
-            info!("started grpc server at {}", addr);
+            log::info!("started grpc server at {}", addr);
 
             Server::builder()
                 .add_service(NodeServiceServer::new(node_listener))
@@ -333,7 +335,7 @@ impl Manager {
         Ok(())
     }
 
-    pub async fn run(&mut self) -> Result<(), ManagerError> {
+    pub async fn run(&mut self) -> Result<()> {
         // connect to the controller
         self.connect_to_controller()
             .await
