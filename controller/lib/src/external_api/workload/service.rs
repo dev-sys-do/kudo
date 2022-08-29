@@ -1,9 +1,8 @@
 use std::net::SocketAddr;
 
 use super::filter::FilterService;
-use super::model::{Ressources, Type, Workload, WorkloadDTO, WorkloadError};
+use super::model::{Ressources, Type, Workload, WorkloadDTO, WorkloadError, WorkloadVector};
 use crate::etcd::EtcdClient;
-use actix_web::HttpResponse;
 use serde_json;
 
 pub struct WorkloadService {
@@ -21,15 +20,6 @@ impl WorkloadService {
         };
         Ok(inner)
     }
-
-    pub async fn new_or_http_error(
-        etcd_address: &SocketAddr,
-    ) -> Result<WorkloadService, HttpResponse> {
-        WorkloadService::new(etcd_address)
-            .await
-            .map_err(|_| HttpResponse::InternalServerError().body("Cannot create workload service"))
-    }
-
     pub async fn get_workload(
         &mut self,
         workload_name: &str,
@@ -55,7 +45,7 @@ impl WorkloadService {
         limit: u32,
         offset: u32,
         namespace: &str,
-    ) -> Vec<Workload> {
+    ) -> WorkloadVector {
         let mut new_vec: Vec<Workload> = Vec::new();
         match self.etcd_service.get_all().await {
             Some(workloads) => {
@@ -67,10 +57,18 @@ impl WorkloadService {
                         }
                     }
                 }
+                if offset > 0 {
+                    match self.filter_service.offset(&new_vec, offset) {
+                        Ok(workloads) => new_vec = workloads,
+                        Err(_) => return WorkloadVector::new(vec![]),
+                    }
+                }
+                if limit > 0 {
+                    new_vec = self.filter_service.limit(&new_vec, limit);
+                }
+                WorkloadVector::new(new_vec)
             }
-            None => {
-                vec![]
-            }
+            None => WorkloadVector::new(vec![]),
         }
     }
 
