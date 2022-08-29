@@ -15,12 +15,13 @@ struct Cli {
     ///
     /// Default: 'info', if the flag is set but no level is given, 'debug' is used.
     #[clap(short, long)]
+    #[clap(short, long, global = true)]
     verbosity: Option<Option<String>>,
 
     /// Set the controller adress
     ///
     /// This has priority over the config file and enviorment variable.
-    #[clap(short, long)]
+    #[clap(short, long, global = true)]
     host: Option<String>,
 
     /// Define which namespace to target
