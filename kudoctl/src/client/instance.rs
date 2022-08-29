@@ -7,15 +7,22 @@ use crate::{client::types::IdResponse, resource::workload};
 
 use super::request::Client;
 
+#[derive(Debug, Serialize)]
+struct CreateRequestBody {
+    pub workload_name: String,
+}
+
 /// Starts an instance on the cluster.
 ///
 /// Returns the id of the instance.
-pub async fn create(client: &Client, workload_id: &String) -> anyhow::Result<String> {
+pub async fn create(client: &Client, namespace: &str, workload_id: &str) -> anyhow::Result<String> {
     let response: IdResponse = (*client)
-        .send_json_request::<IdResponse, ()>(
-            &format!("/instance/?workloadId={}", workload_id),
+        .send_json_request(
+            &format!("/instance/{}", namespace),
             Method::PUT,
-            None,
+            Some(&CreateRequestBody {
+                workload_name: workload_id.to_owned(),
+            }),
         )
         .await
         .context("Error creating instance")?;
@@ -46,9 +53,13 @@ pub struct GetInstancesResponse {
 }
 
 /// List the instances in the cluster.
-pub async fn list(client: &Client) -> anyhow::Result<GetInstancesResponse> {
+pub async fn list(client: &Client, namespace: &str) -> anyhow::Result<GetInstancesResponse> {
     let response: GetInstancesResponse = (*client)
-        .send_json_request::<GetInstancesResponse, ()>("/instance", Method::GET, None)
+        .send_json_request::<GetInstancesResponse, ()>(
+            format!("/instance/{}", namespace).as_str(),
+            Method::GET,
+            None,
+        )
         .await
         .context("Error getting instances")?;
     debug!(
@@ -60,9 +71,13 @@ pub async fn list(client: &Client) -> anyhow::Result<GetInstancesResponse> {
 }
 
 /// Get info about one instance.
-pub async fn get(client: &Client, instance_id: &str) -> anyhow::Result<Instance> {
+pub async fn get(client: &Client, namespace: &str, instance_id: &str) -> anyhow::Result<Instance> {
     let response: Instance = (*client)
-        .send_json_request::<Instance, ()>(&format!("/instance/{}", instance_id), Method::GET, None)
+        .send_json_request::<Instance, ()>(
+            &format!("/instance/{}/{}", namespace, instance_id),
+            Method::GET,
+            None,
+        )
         .await
         .context("Error getting instance")?;
     debug!("Instance {} received", response.id);
@@ -70,9 +85,13 @@ pub async fn get(client: &Client, instance_id: &str) -> anyhow::Result<Instance>
 }
 
 /// Delete an instance with the given id.
-pub async fn delete(client: &Client, instance_id: &str) -> anyhow::Result<()> {
+pub async fn delete(client: &Client, namespace: &str, instance_id: &str) -> anyhow::Result<()> {
     (*client)
-        .send_json_request::<(), ()>(&format!("/instance/{}", instance_id), Method::DELETE, None)
+        .send_json_request::<(), ()>(
+            &format!("/instance/{}/{}", namespace, instance_id),
+            Method::DELETE,
+            None,
+        )
         .await
         .context("Error deleting instance")?;
     debug!("Instance {} deleted", instance_id);

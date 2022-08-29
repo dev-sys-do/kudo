@@ -93,7 +93,8 @@ pub async fn execute(args: Apply, conf: &config::Config) -> Result<String> {
             };
 
             if needs_instance_create {
-                let instance_id = client::instance::create(&client, &workload_id).await?;
+                let instance_id =
+                    client::instance::create(&client, &conf.namespace, &workload.name).await?;
 
                 info!(
                     "Workload {} created with id {} and started with instance {}",
