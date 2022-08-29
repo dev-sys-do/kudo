@@ -451,3 +451,212 @@ impl Orchestrator {
             && available_resources.disk as f64 * 0.95 >= needed_resources.disk as f64
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        net::{IpAddr, Ipv4Addr},
+        sync::Arc,
+    };
+
+    use proto::scheduler::{Instance, Resource, ResourceSummary, Status};
+
+    use crate::{
+        config::Config,
+        instance::InstanceProxied,
+        node::{Node, NodeProxied},
+        storage::{IStorage, Storage},
+    };
+
+    #[test]
+    fn find_best_node_enough_resources() {
+        let instances: Storage<InstanceProxied> = Storage::new();
+        let mut nodes: Storage<NodeProxied> = Storage::new();
+        let config = Arc::new(Config::default());
+
+        nodes.update(
+            "node",
+            NodeProxied {
+                id: "node".to_string(),
+                node: Node {
+                    id: "node".to_string(),
+                    status: Status::Running,
+                    resource: Some(Resource {
+                        limit: Some(ResourceSummary {
+                            cpu: 20,
+                            memory: 20,
+                            disk: 20,
+                        }),
+                        usage: None,
+                    }),
+                },
+                address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                tx: None,
+                grpc_client: None,
+                instances: Vec::new(),
+            },
+        );
+
+        nodes.update(
+            "node2",
+            NodeProxied {
+                id: "node2".to_string(),
+                node: Node {
+                    id: "node2".to_string(),
+                    status: Status::Running,
+                    resource: Some(Resource {
+                        limit: Some(ResourceSummary {
+                            cpu: 50,
+                            memory: 50,
+                            disk: 50,
+                        }),
+                        usage: None,
+                    }),
+                },
+                address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                tx: None,
+                grpc_client: None,
+                instances: Vec::new(),
+            },
+        );
+
+        let orchestrator = super::Orchestrator::new(instances, nodes, config.clone());
+
+        let instance: Instance = Instance {
+            id: "instance".to_string(),
+            name: "instance".to_string(),
+            r#type: 0,
+            status: 7,
+            uri: "127.0.0.1".to_string(),
+            environnement: Vec::new(),
+            resource: Some(Resource {
+                limit: Some(ResourceSummary {
+                    cpu: 30,
+                    memory: 10,
+                    disk: 5,
+                }),
+                usage: None,
+            }),
+            ports: Vec::new(),
+            ip: "127.0.0.1".to_string(),
+        };
+
+        let node_id = orchestrator.find_best_node(&instance).unwrap();
+
+        assert_eq!(node_id, "node2");
+    }
+
+    #[test]
+    fn find_best_node_not_enough_resources() {
+        let instances: Storage<InstanceProxied> = Storage::new();
+        let mut nodes: Storage<NodeProxied> = Storage::new();
+        let config = Arc::new(Config::default());
+
+        nodes.update(
+            "node",
+            NodeProxied {
+                id: "node".to_string(),
+                node: Node {
+                    id: "node".to_string(),
+                    status: Status::Running,
+                    resource: Some(Resource {
+                        limit: Some(ResourceSummary {
+                            cpu: 20,
+                            memory: 20,
+                            disk: 20,
+                        }),
+                        usage: None,
+                    }),
+                },
+                address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                tx: None,
+                grpc_client: None,
+                instances: Vec::new(),
+            },
+        );
+
+        nodes.update(
+            "node2",
+            NodeProxied {
+                id: "node2".to_string(),
+                node: Node {
+                    id: "node2".to_string(),
+                    status: Status::Running,
+                    resource: Some(Resource {
+                        limit: Some(ResourceSummary {
+                            cpu: 50,
+                            memory: 50,
+                            disk: 50,
+                        }),
+                        usage: None,
+                    }),
+                },
+                address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                tx: None,
+                grpc_client: None,
+                instances: Vec::new(),
+            },
+        );
+
+        let orchestrator = super::Orchestrator::new(instances, nodes, config.clone());
+
+        let instance: Instance = Instance {
+            id: "instance".to_string(),
+            name: "instance".to_string(),
+            r#type: 0,
+            status: 7,
+            uri: "127.0.0.1".to_string(),
+            environnement: Vec::new(),
+            resource: Some(Resource {
+                limit: Some(ResourceSummary {
+                    cpu: 30,
+                    memory: 48,
+                    disk: 5,
+                }),
+                usage: None,
+            }),
+            ports: Vec::new(),
+            ip: "127.0.0.1".to_string(),
+        };
+
+        if Orchestrator::new(instances, nodes, config)
+            .find_best_node(&instance)
+            .is_ok()
+        {
+            panic!("should not find a node");
+        }
+    }
+
+    #[test]
+    fn find_best_node_no_nodes_avaliable() {
+        let instances: Storage<InstanceProxied> = Storage::new();
+        let nodes: Storage<NodeProxied> = Storage::new();
+        let config = Arc::new(Config::default());
+
+        let instance: Instance = Instance {
+            id: "instance".to_string(),
+            name: "instance".to_string(),
+            r#type: 0,
+            status: 7,
+            uri: "127.0.0.1".to_string(),
+            environnement: Vec::new(),
+            resource: Some(Resource {
+                limit: Some(ResourceSummary {
+                    cpu: 0,
+                    memory: 0,
+                    disk: 0,
+                }),
+                usage: None,
+            }),
+            ports: Vec::new(),
+            ip: "127.0.0.1".to_string(),
+        };
+
+        match orchestrator.find_best_node(&instance) {
+            Ok(_) => {
+                panic!("should not find a node");
+            }
+            Err(_) => (),
+        };
+    }
+}
