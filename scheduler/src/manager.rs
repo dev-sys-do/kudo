@@ -3,20 +3,23 @@ use std::sync::Arc;
 use anyhow::Result;
 use log::{debug, info};
 use proto::scheduler::{
-    instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer, InstanceStatus, Status, NodeRegisterResponse,
+    instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
+    InstanceStatus, NodeRegisterResponse, Status,
 };
-use tokio::{task::JoinHandle, sync::Mutex};
-use tonic::transport::Server;
 use tokio::sync::{mpsc, oneshot};
+use tokio::{sync::Mutex, task::JoinHandle};
+use tonic::transport::Server;
 use uuid::Uuid;
 
 use crate::SchedulerError;
 use crate::{
-    instance_listener::InstanceListener, node_listener::NodeListener, storage::Storage, Event, orchestrator::{Orchestrator}, Node,
+    config::Config, instance_listener::InstanceListener, node_listener::NodeListener,
+    orchestrator::Orchestrator, storage::Storage, Event, Node,
 };
 
 #[derive(Debug)]
 pub struct Manager {
+    config: Arc<Config>,
     orchestrator: Arc<Mutex<Orchestrator>>,
 }
 
@@ -26,12 +29,13 @@ impl Manager {
     /// Returns:
     ///
     /// A new Manager struct
-    pub fn new() -> Self {
+    pub fn new(config: Config) -> Self {
         let instances = Storage::new();
         let nodes = Storage::new();
         let orchestrator = Orchestrator::new(instances, nodes);
 
         Manager {
+            config: Arc::new(config),
             orchestrator: Arc::new(Mutex::new(orchestrator)),
         }
     }
@@ -44,7 +48,7 @@ impl Manager {
     /// * `tx`: mpsc::Sender<Event>
     ///
     /// Returns:
-    /// 
+    ///
     /// A JoinHandle<()>
     fn create_grpc_server(&self, tx: mpsc::Sender<Event>) -> Result<JoinHandle<()>> {
         info!("creating grpc server ...");
@@ -114,30 +118,33 @@ impl Manager {
                         match orchestrator.lock().await.find_best_node(&instance) {
                             Ok(_) => {
                                 info!("found best node for instance : {:?}", instance);
-                            },
+                            }
                             Err(err) => {
                                 info!("error finding best node for instance : {:?}", err);
 
                                 let instance_status = InstanceStatus {
                                     id: instance.id,
                                     status: Status::Failed.into(),
-                                    status_description: format!("Error thrown by the orchestrator: {:?}", err),
-                                    resource: None
+                                    status_description: format!(
+                                        "Error thrown by the orchestrator: {:?}",
+                                        err
+                                    ),
+                                    resource: None,
                                 };
 
                                 let _ = tx.send(Ok(instance_status)).await;
-                            },
+                            }
                         };
-                    },
+                    }
                     Event::InstanceStart(instance) => {
                         info!("received instance start event : {:?}", instance);
-                    },
+                    }
                     Event::InstanceStop(instance) => {
                         info!("received instance stop event : {:?}", instance);
-                    },
+                    }
                     Event::InstanceDestroy(instance) => {
                         info!("received instance destroy event : {:?}", instance);
-                    },
+                    }
                     Event::NodeRegister(request, tx) => {
                         info!("received node register event : {:?}", request);
 
@@ -149,28 +156,31 @@ impl Manager {
                         match orchestrator.lock().await.register_node(node) {
                             Ok(_) => {
                                 info!("successfully registered node");
-                                
+
                                 let response = NodeRegisterResponse {
                                     code: 0,
                                     description: "Welcome to the cluster".to_string(),
                                     subnet: "".to_string(),
                                 };
-        
+
                                 tx.send(Ok(tonic::Response::new(response))).unwrap();
-                            },
+                            }
                             Err(err) => {
                                 info!("error while registering node : {:?}", err);
 
                                 let response = NodeRegisterResponse {
                                     code: 1,
-                                    description: format!("Error thrown by the orchestrator: {:?}", err),
+                                    description: format!(
+                                        "Error thrown by the orchestrator: {:?}",
+                                        err
+                                    ),
                                     subnet: "".to_string(),
                                 };
-        
+
                                 tx.send(Ok(tonic::Response::new(response))).unwrap();
-                            },
+                            }
                         };
-                    },
+                    }
                 }
             }
         })
