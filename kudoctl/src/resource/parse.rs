@@ -32,7 +32,6 @@ resources:
                 assert_eq!(workload.resources.memory, 2);
                 assert_eq!(workload.resources.disk, 3);
             }
-            _ => panic!("Unexpected resource type"),
         }
     }
 
@@ -58,7 +57,6 @@ ports:
                 assert_eq!(workload.ports.as_ref().unwrap()[0], "8080:8080");
                 assert_eq!(workload.ports.as_ref().unwrap()[1], "8081:8081");
             }
-            _ => panic!("Unexpected resource type"),
         }
     }
 
@@ -84,7 +82,6 @@ env:
                 assert_eq!(workload.env.as_ref().unwrap()[0], "KEY1=VALUE1");
                 assert_eq!(workload.env.as_ref().unwrap()[1], "KEY2=VALUE2");
             }
-            _ => panic!("Unexpected resource type"),
         }
     }
 
