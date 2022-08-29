@@ -1,15 +1,17 @@
+use std::net::IpAddr;
+
 use proto::scheduler::{
     Instance, InstanceStatus, NodeRegisterRequest, NodeRegisterResponse, NodeStatus,
-    NodeUnregisterRequest, NodeUnregisterResponse, Resource, Status,
+    NodeUnregisterRequest, NodeUnregisterResponse,
 };
 use thiserror::Error;
 use tokio::sync::{mpsc, oneshot};
 use tonic::Response;
 
 pub mod config;
-pub mod instance_listener;
+pub mod instance;
 pub mod manager;
-pub mod node_listener;
+pub mod node;
 pub mod orchestrator;
 pub mod storage;
 
@@ -28,11 +30,12 @@ pub enum SchedulerError {
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
-pub struct Node {
-    id: String,
-    status: Status,
-    resource: Option<Resource>,
+pub enum ProxyError {
+    TonicTransportError(tonic::transport::Error),
+    TonicStatusError(tonic::Status),
+    GrpcClientNotFound,
+    ChannelSenderError,
+    InvalidStatus,
 }
 
 pub type NodeIdentifier = String;
@@ -44,10 +47,6 @@ pub enum Event {
     InstanceCreate(
         Instance,
         mpsc::Sender<Result<InstanceStatus, tonic::Status>>,
-    ),
-    InstanceStart(
-        NodeIdentifier,
-        oneshot::Sender<Result<Response<()>, tonic::Status>>,
     ),
     InstanceStop(
         NodeIdentifier,
@@ -61,6 +60,7 @@ pub enum Event {
     // Node events
     NodeRegister(
         NodeRegisterRequest,
+        IpAddr,
         oneshot::Sender<Result<Response<NodeRegisterResponse>, tonic::Status>>,
     ),
     NodeUnregister(

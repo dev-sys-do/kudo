@@ -13,8 +13,8 @@ use uuid::Uuid;
 
 use crate::SchedulerError;
 use crate::{
-    config::Config, instance_listener::InstanceListener, node_listener::NodeListener,
-    orchestrator::Orchestrator, storage::Storage, Event, Node,
+    config::Config, instance::InstanceListener, node::NodeListener, orchestrator::Orchestrator,
+    storage::Storage, Event,
 };
 
 #[derive(Debug)]
@@ -114,18 +114,22 @@ impl Manager {
                 debug!("received event : {:?}", event);
                 match event {
                     Event::InstanceCreate(instance, tx) => {
-                        info!("received instance create event : {:?}", instance);
+                        trace!("received instance create event : {:?}", instance);
 
-                        // should be move in the orchestrator but it's here for testing
-                        match orchestrator.lock().await.find_best_node(&instance) {
+                        match orchestrator
+                            .lock()
+                            .await
+                            .create_instance(instance.clone(), tx.clone())
+                            .await
+                        {
                             Ok(_) => {
-                                info!("found best node for instance : {:?}", instance);
+                                // todo: proxy the stream to the controller
                             }
                             Err(err) => {
-                                info!("error finding best node for instance : {:?}", err);
+                                debug!("error finding best node for instance : {:?}", err);
 
                                 let instance_status = InstanceStatus {
-                                    id: instance.id,
+                                    id: Uuid::new_v4().to_string(),
                                     status: Status::Failed.into(),
                                     status_description: format!(
                                         "Error thrown by the orchestrator: {:?}",
@@ -136,30 +140,12 @@ impl Manager {
 
                                 let _ = tx.send(Ok(instance_status)).await;
                             }
-                        };
-                    }
-                    Event::InstanceStart(id, tx) => {
-                        info!("received instance start event : {:?}", id);
-
-                        match orchestrator.lock().await.start_instance(id.clone()).await {
-                            Ok(_) => {
-                                info!("started instance : {:?}", id);
-                                tx.send(Ok(Response::new(()))).unwrap();
-                            }
-                            Err(err) => {
-                                info!("error while starting instance : {:?}", err);
-                                tx.send(Err(tonic::Status::internal(format!(
-                                    "Error thrown by the orchestrator: {:?}",
-                                    err
-                                ))))
-                                .unwrap();
-                            }
-                        };
+                        }
                     }
                     Event::InstanceStop(id, tx) => {
-                        info!("received instance stop event : {:?}", id);
+                        trace!("received instance stop event : {:?}", id);
 
-                        match orchestrator.lock().await.stop_instance(id.clone()) {
+                        match orchestrator.lock().await.stop_instance(id.clone()).await {
                             Ok(_) => {
                                 info!("stopped instance : {:?}", id);
                                 tx.send(Ok(Response::new(()))).unwrap();
@@ -175,9 +161,9 @@ impl Manager {
                         };
                     }
                     Event::InstanceDestroy(id, tx) => {
-                        info!("received instance destroy event : {:?}", id);
+                        trace!("received instance destroy event : {:?}", id);
 
-                        match orchestrator.lock().await.destroy_instance(id.clone()) {
+                        match orchestrator.lock().await.destroy_instance(id.clone()).await {
                             Ok(_) => {
                                 info!("destroyed instance : {:?}", id);
                                 tx.send(Ok(Response::new(()))).unwrap();
@@ -192,8 +178,8 @@ impl Manager {
                             }
                         };
                     }
-                    Event::NodeRegister(request, tx) => {
-                        info!("received node register event : {:?}", request);
+                    Event::NodeRegister(request, addr, tx) => {
+                        trace!("received node register event : {:?}", request);
 
                         // todo: parse certificate and get the node information
                         let node = Node {
@@ -204,7 +190,7 @@ impl Manager {
 
                         debug!("registered node : {:?}", node);
 
-                        match orchestrator.lock().await.register_node(node) {
+                        match orchestrator.lock().await.register_node(node, addr).await {
                             Ok(_) => {
                                 info!("successfully registered node");
 
@@ -233,7 +219,7 @@ impl Manager {
                         };
                     }
                     Event::NodeUnregister(request, tx) => {
-                        info!("received node unregister event : {:?}", request);
+                        trace!("received node unregister event : {:?}", request);
 
                         match orchestrator.lock().await.unregister_node(request.id) {
                             Ok(_) => {
@@ -262,12 +248,13 @@ impl Manager {
                         };
                     }
                     Event::NodeStatus(status, tx) => {
-                        info!("received node status event : {:?}", status);
+                        trace!("received node status event : {:?}", status);
 
                         match orchestrator
                             .lock()
                             .await
                             .update_node_status(status.id.clone(), status)
+                            .await
                         {
                             Ok(_) => {
                                 info!("successfully updated node status");

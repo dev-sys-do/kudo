@@ -1,15 +1,16 @@
-use std::sync::Arc;
+use std::{net::IpAddr, sync::Arc};
 
 use log::{debug, info};
-use proto::{
-    agent::{self, instance_service_client::InstanceServiceClient},
-    scheduler::{Instance, NodeStatus, Port, Resource, ResourceSummary, Status},
-};
+use proto::scheduler::{Instance, InstanceStatus, NodeStatus, Resource, ResourceSummary, Status};
+use tokio::sync::mpsc;
+use tonic::Streaming;
 
 use crate::{
     config::Config,
+    instance::InstanceProxied,
+    node::{Node, NodeProxied},
     storage::{IStorage, Storage},
-    InstanceIdentifier, Node, NodeIdentifier,
+    InstanceIdentifier, NodeIdentifier, ProxyError,
 };
 
 #[derive(Debug)]
@@ -19,104 +20,187 @@ pub enum OrchestratorError {
     InstanceNotFound,
     NetworkError(String),
     NotEnoughResources,
+    FromProxyError(ProxyError),
 }
 
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct Orchestrator {
-    instances: Storage<Instance>,
-    nodes: Storage<Node>,
+    instances: Storage<InstanceProxied>,
+    nodes: Storage<NodeProxied>,
     config: Arc<Config>,
 }
 
 impl Orchestrator {
-    pub fn new(instances: Storage<Instance>, nodes: Storage<Node>, config: Arc<Config>) -> Self {
+    pub fn new(
+        instances: Storage<InstanceProxied>,
+        nodes: Storage<NodeProxied>,
+        config: Arc<Config>,
+    ) -> Self {
         Orchestrator {
             instances,
             nodes,
-            config,
+            config: config.clone(),
         }
     }
 
-    pub async fn start_instance(&self, id: InstanceIdentifier) -> Result<(), OrchestratorError> {
-        let instance = self
+    /// It creates an instance
+    ///
+    /// Arguments:
+    ///
+    /// * `instance`: Instance - the instance to create
+    /// * `tx`: mpsc::Sender<Result<InstanceStatus, tonic::Status>>
+    ///
+    /// Returns:
+    ///
+    /// A stream of InstanceStatus
+    pub async fn create_instance(
+        &mut self,
+        instance: Instance,
+        tx: mpsc::Sender<Result<InstanceStatus, tonic::Status>>,
+    ) -> Result<Streaming<proto::agent::InstanceStatus>, OrchestratorError> {
+        let mut instance_proxied = InstanceProxied::new(instance.id.clone(), instance, None, tx);
+
+        // set instance status to Scheduling
+        instance_proxied
+            .change_status(Status::Scheduling, None)
+            .await
+            .map_err(OrchestratorError::FromProxyError)?;
+
+        // find best node for the instance
+        let target_node_id = self.find_best_node(&instance_proxied.instance)?;
+        let target_node = self
+            .nodes
+            .get_mut(&target_node_id)
+            .ok_or(OrchestratorError::NodeNotFound)?; // should never be None
+
+        // create the instance on the node
+        let stream = target_node
+            .create_instance(instance_proxied.instance.clone())
+            .await
+            .map_err(OrchestratorError::FromProxyError)?;
+
+        // set instance status to Scheduled
+        instance_proxied
+            .change_status(
+                Status::Scheduled,
+                Some(format!("Instance is scheduled on node: {}", target_node_id)),
+            )
+            .await
+            .map_err(OrchestratorError::FromProxyError)?;
+
+        // save the instance in the orchestrator
+        self.instances
+            .update(instance_proxied.id.clone().as_str(), instance_proxied);
+
+        Ok(stream)
+    }
+
+    /// It stop an instance
+    ///
+    /// Arguments:
+    ///
+    /// * `id`: InstanceIdentifier
+    ///
+    /// Returns:
+    ///
+    /// A Result<(), OrchestratorError>
+    pub async fn stop_instance(&mut self, id: InstanceIdentifier) -> Result<(), OrchestratorError> {
+        let instance_proxied = self
             .instances
-            .get(&id)
+            .get_mut(&id)
             .ok_or(OrchestratorError::InstanceNotFound)?;
 
-        // check if instance is already running
-        if instance.status() == Status::Running || instance.status() == Status::Starting {
-            return Ok(());
-        }
-
-        let config = self.config.clone();
-
-        let mut client = match InstanceServiceClient::connect(format!(
-            "{}:{}",
-            config.agent.host, config.agent.port
-        ))
-        .await
+        // check if instance is already stopped
+        if instance_proxied.instance.status() == Status::Stopped
+            || instance_proxied.instance.status() == Status::Stopping
         {
-            Ok(client) => client,
-            Err(_) => {
-                return Err(OrchestratorError::NetworkError(
-                    "Could not connect to node agent".to_string(),
-                ));
-            }
-        };
-
-        let request = tonic::Request::new(Transformer::scheduler_instance_to_agent_instance(
-            instance.clone(),
-        ));
-
-        let response = match client.create(request).await {
-            Ok(response) => response,
-            Err(_) => {
-                return Err(OrchestratorError::NetworkError(
-                    "Could not connect to node agent".to_string(),
-                ));
-            }
-        };
-
-        println!("RESPONSE={:?}", response);
-
-        Ok(())
-    }
-
-    pub fn stop_instance(&self, id: InstanceIdentifier) -> Result<(), OrchestratorError> {
-        let instance = self
-            .instances
-            .get(&id)
-            .ok_or(OrchestratorError::InstanceNotFound)?;
-
-        // check if instance is already stopped
-        if instance.status() == Status::Stopped || instance.status() == Status::Stopping {
             return Ok(());
         }
 
-        // todo: stop instance from node agent's api
+        // get the node where the instance is running
+        let node_proxied = self
+            .nodes
+            .get_mut(&instance_proxied.node_id.clone().unwrap())
+            .ok_or(OrchestratorError::NodeNotFound)?; // should never be None
 
-        Ok(())
+        // send stop signal to the node
+        node_proxied
+            .stop_instance(instance_proxied.id.clone())
+            .await
+            .map_err(OrchestratorError::FromProxyError)
     }
 
-    pub fn destroy_instance(&self, id: InstanceIdentifier) -> Result<(), OrchestratorError> {
-        let instance = self
+    /// It destroys an instance
+    ///
+    /// Arguments:
+    ///
+    /// * `id`: InstanceIdentifier
+    ///
+    /// Returns:
+    ///
+    /// A Result<(), OrchestratorError>
+    pub async fn destroy_instance(
+        &mut self,
+        id: InstanceIdentifier,
+    ) -> Result<(), OrchestratorError> {
+        let instance_proxied = self
             .instances
-            .get(&id)
+            .get_mut(&id)
             .ok_or(OrchestratorError::InstanceNotFound)?;
 
         // check if instance is already stopped
-        if instance.status() == Status::Destroying || instance.status() == Status::Terminated {
+        if instance_proxied.instance.status() == Status::Destroying
+            || instance_proxied.instance.status() == Status::Terminated
+        {
             return Ok(());
         }
 
-        // todo: destroy instance from node agent's api
+        // get the node where the instance is running
+        let node_proxied = self
+            .nodes
+            .get_mut(&instance_proxied.node_id.clone().unwrap())
+            .ok_or(OrchestratorError::NodeNotFound)?; // should never be None
 
-        Ok(())
+        // send kill signal to the node
+        node_proxied
+            .kill_instance(instance_proxied.id.clone())
+            .await
+            .map_err(OrchestratorError::FromProxyError)
     }
 
-    pub fn register_node(&mut self, node: Node) -> Result<(), OrchestratorError> {
-        self.nodes.update(&node.id.clone(), node);
+    /// It registers a node with the orchestrator
+    ///
+    /// Arguments:
+    ///
+    /// * `node`: Node - the node to register
+    /// * `addr`: IpAddr - the IP address of the node
+    ///
+    /// Returns:
+    ///
+    /// Result<(), OrchestratorError>
+    pub async fn register_node(
+        &mut self,
+        node: Node,
+        addr: IpAddr,
+    ) -> Result<(), OrchestratorError> {
+        let mut node_proxied = NodeProxied::new(node.id.clone(), node, addr);
+        debug!("registering node: {:?}", node_proxied);
+
+        // connect to node agent grpc service
+        node_proxied
+            .connect_to_grpc()
+            .await
+            .map_err(OrchestratorError::FromProxyError)?;
+
+        // update node status as Starting
+        node_proxied
+            .update_status(Status::Starting, None, None)
+            .await
+            .map_err(OrchestratorError::FromProxyError)?;
+
+        // save node in the orchestrator
+        self.nodes.update(&node_proxied.id.clone(), node_proxied);
         Ok(())
     }
 
@@ -126,29 +210,44 @@ impl Orchestrator {
             .get(&id.clone())
             .ok_or(OrchestratorError::NodeNotFound)?;
 
+        // todo: get instance from node and change status to Destroyed
+
         self.nodes.delete(&id.clone());
         Ok(())
     }
 
-    pub fn update_node_status(
+    /// Update the status of a node in the orchestrator.
+    ///
+    /// The first thing we do is get the node from the `nodes` map. If the node is not found, we return
+    /// an error else we update the node status.
+    ///
+    /// Arguments:
+    ///
+    /// * `id`: The identifier of the node to update.
+    /// * `status`: The status of the node.
+    ///
+    /// Returns:
+    ///
+    /// A Result<(), OrchestratorError>
+    pub async fn update_node_status(
         &mut self,
         id: NodeIdentifier,
         status: NodeStatus,
     ) -> Result<(), OrchestratorError> {
         // Return an error if the node is not found.
-        self.nodes
-            .get(&id.clone())
+        let node_proxied = self
+            .nodes
+            .get_mut(&id.clone())
             .ok_or(OrchestratorError::NodeNotFound)?;
 
-        self.nodes.update(
-            &id.clone(),
-            Node {
-                id: status.id,
-                status: Status::Running,
-                resource: status.resource,
-            },
-        );
-        Ok(())
+        node_proxied
+            .update_status(
+                status.status(),
+                Some(status.status_description),
+                status.resource,
+            )
+            .await
+            .map_err(OrchestratorError::FromProxyError)
     }
 
     /// Find the best node for the given instance
@@ -170,9 +269,9 @@ impl Orchestrator {
             return Err(OrchestratorError::NoAvailableNodes);
         }
 
-        for (_, node) in nodes {
+        for (_, node_proxied) in nodes {
             let has_enough_resources = match Self::has_enough_resources(
-                node.resource.clone().unwrap(),
+                node_proxied.node.resource.clone().unwrap(),
                 instance.resource.clone().unwrap(),
             ) {
                 Ok(_) => true,
@@ -180,8 +279,13 @@ impl Orchestrator {
             };
 
             if has_enough_resources {
-                info!("Instance will be scheduled on node: {:?}", node.id.clone());
-                return Ok(node.id.clone());
+                info!(
+                    "scheduling instance {:?} on node: {:?}",
+                    instance.id.clone(),
+                    node_proxied.node.id.clone()
+                );
+
+                return Ok(node_proxied.node.id.clone());
             }
         }
 
@@ -239,110 +343,5 @@ impl Orchestrator {
         Ok(available_resources.cpu >= needed_resources.cpu
             && available_resources.memory >= needed_resources.memory
             && available_resources.disk >= needed_resources.disk)
-    }
-}
-
-struct Transformer {}
-
-#[allow(dead_code)]
-impl Transformer {
-    pub fn scheduler_instance_to_agent_instance(instance: Instance) -> agent::Instance {
-        agent::Instance {
-            id: instance.id,
-            name: instance.name,
-            r#type: instance.r#type,
-            status: instance.status.into(),
-            uri: instance.uri,
-            environment: instance.environnement,
-            resource: match instance.resource {
-                Some(r) => Some(Self::scheduler_resource_to_agent_resource(r)),
-                None => None,
-            },
-            ports: Self::scheduler_ports_to_agent_ports(instance.ports),
-            ip: instance.ip,
-        }
-    }
-
-    pub fn agent_instance_to_scheduler_instance(instance: agent::Instance) -> Instance {
-        Instance {
-            id: instance.id,
-            name: instance.name,
-            r#type: instance.r#type,
-            status: instance.status.into(),
-            uri: instance.uri,
-            environnement: instance.environment,
-            resource: match instance.resource {
-                Some(r) => Some(Self::agent_resource_to_scheduler_resource(r)),
-                None => None,
-            },
-            ports: Self::agent_ports_to_scheduler_ports(instance.ports),
-            ip: instance.ip,
-        }
-    }
-
-    pub fn scheduler_resource_to_agent_resource(resource: Resource) -> agent::Resource {
-        agent::Resource {
-            limit: match resource.limit {
-                Some(r) => Some(Self::scheduler_resourcesummary_to_agent_resourcesummary(r)),
-                None => None,
-            },
-            usage: match resource.usage {
-                Some(r) => Some(Self::scheduler_resourcesummary_to_agent_resourcesummary(r)),
-                None => None,
-            },
-        }
-    }
-
-    pub fn agent_resource_to_scheduler_resource(resource: agent::Resource) -> Resource {
-        Resource {
-            limit: match resource.limit {
-                Some(r) => Some(Self::agent_resourcesummary_to_scheduler_resourcesummary(r)),
-                None => None,
-            },
-            usage: match resource.usage {
-                Some(r) => Some(Self::agent_resourcesummary_to_scheduler_resourcesummary(r)),
-                None => None,
-            },
-        }
-    }
-
-    pub fn scheduler_resourcesummary_to_agent_resourcesummary(
-        resource: ResourceSummary,
-    ) -> agent::ResourceSummary {
-        agent::ResourceSummary {
-            cpu: resource.cpu,
-            memory: resource.memory,
-            disk: resource.disk,
-        }
-    }
-
-    pub fn agent_resourcesummary_to_scheduler_resourcesummary(
-        resource: agent::ResourceSummary,
-    ) -> ResourceSummary {
-        ResourceSummary {
-            cpu: resource.cpu,
-            memory: resource.memory,
-            disk: resource.disk,
-        }
-    }
-
-    pub fn scheduler_ports_to_agent_ports(ports: Vec<Port>) -> Vec<agent::Port> {
-        ports
-            .into_iter()
-            .map(|port| agent::Port {
-                source: port.source,
-                destination: port.destination,
-            })
-            .collect()
-    }
-
-    pub fn agent_ports_to_scheduler_ports(ports: Vec<agent::Port>) -> Vec<Port> {
-        ports
-            .into_iter()
-            .map(|port| Port {
-                source: port.source,
-                destination: port.destination,
-            })
-            .collect()
     }
 }
