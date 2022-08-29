@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -7,7 +8,6 @@ use proto::scheduler::{
     InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse, Status,
 };
 use tokio::sync::{mpsc, oneshot};
-use tokio::task::JoinError;
 use tokio::{sync::Mutex, task::JoinHandle};
 use tonic::{transport::Server, Response};
 use uuid::Uuid;
@@ -17,12 +17,7 @@ use crate::{
     config::Config, instance::InstanceListener, node::NodeListener, orchestrator::Orchestrator,
     storage::Storage, Event,
 };
-
-#[derive(Debug)]
-pub enum ManagerError {
-    CannotConnectToController(ProxyError),
-    FromTaskError(JoinError),
-}
+use crate::{ManagerError, ProxyError};
 
 #[derive(Debug)]
 pub struct Manager {
@@ -68,10 +63,10 @@ impl Manager {
             .map_err(|_| SchedulerError::InvalidGrpcAddress)?;
 
         let node_listener = NodeListener::new(tx.clone());
-        debug!("create node listener with data : {:?}", node_listener);
+        log::trace!("create node listener with data : {:?}", node_listener);
 
         let instance_listener = InstanceListener::new(tx);
-        debug!(
+        log::trace!(
             "create instance listener with data : {:?}",
             instance_listener
         );
@@ -90,17 +85,17 @@ impl Manager {
 
     /// Create a multi-producer, single-consumer channel with a buffer size of 32
     pub fn create_mpsc_channel<T>() -> (mpsc::Sender<T>, mpsc::Receiver<T>) {
-        debug!("creating mpsc channel ...");
+        log::trace!("creating mpsc channel ...");
         let (tx, rx): (mpsc::Sender<T>, mpsc::Receiver<T>) = mpsc::channel(32);
-        debug!("created mpsc channel");
+        log::trace!("created mpsc channel");
         (tx, rx)
     }
 
     /// It creates a channel that can be used to send a single message from one thread to another
     pub fn create_oneshot_channel<T>() -> (oneshot::Sender<T>, oneshot::Receiver<T>) {
-        debug!("creating oneshot channel ...");
+        log::trace!("creating oneshot channel ...");
         let (tx, rx): (oneshot::Sender<T>, oneshot::Receiver<T>) = oneshot::channel();
-        debug!("created oneshot channel");
+        log::trace!("created oneshot channel");
         (tx, rx)
     }
 
@@ -115,16 +110,18 @@ impl Manager {
     ///
     /// A JoinHandle<()>
     fn listen_events(&self, mut rx: mpsc::Receiver<Event>) -> JoinHandle<()> {
-        info!("listening for incoming events ...");
+        log::debug!("listening for incoming events ...");
         let orchestrator = Arc::clone(&self.orchestrator);
         let controller_client = self.grpc_controller_client.clone();
 
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
-                debug!("received event : {:?}", event);
+                log::debug!("received event : {:?}", event);
+
                 match event {
                     Event::InstanceCreate(instance, tx) => {
-                        trace!("received instance create event : {:?}", instance);
+                        log::trace!("received instance create event : {:?}", instance);
+                        log::info!("scheduling a new instance {:?} ...", instance.id);
 
                         match orchestrator
                             .lock()
@@ -136,7 +133,11 @@ impl Manager {
                                 // todo: proxy the stream to the controller
                             }
                             Err(err) => {
-                                debug!("error finding best node for instance : {:?}", err);
+                                log::error!(
+                                    "error while scheduling instance : {:?} ({:?})",
+                                    instance.id,
+                                    err
+                                );
 
                                 let instance_status = InstanceStatus {
                                     id: Uuid::new_v4().to_string(),
@@ -153,15 +154,17 @@ impl Manager {
                         }
                     }
                     Event::InstanceStop(id, tx) => {
-                        trace!("received instance stop event : {:?}", id);
+                        log::trace!("received instance stop event : {:?}", id);
 
                         match orchestrator.lock().await.stop_instance(id.clone()).await {
                             Ok(_) => {
-                                info!("stopped instance : {:?}", id);
+                                log::info!("stopped instance : {:?}", id);
+
                                 tx.send(Ok(Response::new(()))).unwrap();
                             }
                             Err(err) => {
-                                info!("error while stopping instance : {:?}", err);
+                                log::error!("error while stopping instance : {:?} ({:?})", id, err);
+
                                 tx.send(Err(tonic::Status::internal(format!(
                                     "Error thrown by the orchestrator: {:?}",
                                     err
@@ -171,15 +174,21 @@ impl Manager {
                         };
                     }
                     Event::InstanceDestroy(id, tx) => {
-                        trace!("received instance destroy event : {:?}", id);
+                        log::trace!("received instance destroy event : {:?}", id);
 
                         match orchestrator.lock().await.destroy_instance(id.clone()).await {
                             Ok(_) => {
-                                info!("destroyed instance : {:?}", id);
+                                log::info!("destroyed instance : {:?}", id);
+
                                 tx.send(Ok(Response::new(()))).unwrap();
                             }
                             Err(err) => {
-                                info!("error while destroying instance : {:?}", err);
+                                log::error!(
+                                    "error while destroying instance : {:?} ({:?})",
+                                    id,
+                                    err
+                                );
+
                                 tx.send(Err(tonic::Status::internal(format!(
                                     "Error thrown by the orchestrator: {:?}",
                                     err
@@ -189,7 +198,7 @@ impl Manager {
                         };
                     }
                     Event::NodeRegister(request, addr, tx) => {
-                        trace!("received node register event : {:?}", request);
+                        log::trace!("received node register event : {:?}", request);
 
                         // todo: parse certificate and get the node information
                         let node = Node {
@@ -198,16 +207,14 @@ impl Manager {
                             resource: None,
                         };
 
-                        debug!("registered node : {:?}", node);
-
                         match orchestrator
                             .lock()
                             .await
-                            .register_node(node, addr, controller_client.clone())
+                            .register_node(node.clone(), addr, controller_client.clone())
                             .await
                         {
                             Ok(_) => {
-                                info!("successfully registered node");
+                                log::info!("successfully registered node: {:?}", node.id);
 
                                 let response = NodeRegisterResponse {
                                     code: 0,
@@ -218,7 +225,11 @@ impl Manager {
                                 tx.send(Ok(tonic::Response::new(response))).unwrap();
                             }
                             Err(err) => {
-                                info!("error while registering node : {:?}", err);
+                                log::error!(
+                                    "error while registering node : {:?} ({:?})",
+                                    node.id,
+                                    err
+                                );
 
                                 let response = NodeRegisterResponse {
                                     code: 1,
@@ -234,11 +245,15 @@ impl Manager {
                         };
                     }
                     Event::NodeUnregister(request, tx) => {
-                        trace!("received node unregister event : {:?}", request);
+                        log::trace!("received node unregister event : {:?}", request);
 
-                        match orchestrator.lock().await.unregister_node(request.id) {
+                        match orchestrator
+                            .lock()
+                            .await
+                            .unregister_node(request.id.clone())
+                        {
                             Ok(_) => {
-                                info!("successfully unregistered node");
+                                log::info!("successfully unregistered node {:?}", request.id);
 
                                 let response = NodeUnregisterResponse {
                                     code: 0,
@@ -248,7 +263,11 @@ impl Manager {
                                 tx.send(Ok(tonic::Response::new(response))).unwrap();
                             }
                             Err(err) => {
-                                info!("error while unregistering node : {:?}", err);
+                                log::error!(
+                                    "error while unregistering node : {:?} ({:?})",
+                                    request.id,
+                                    err
+                                );
 
                                 let response = NodeUnregisterResponse {
                                     code: 1,
@@ -263,20 +282,26 @@ impl Manager {
                         };
                     }
                     Event::NodeStatus(status, tx) => {
-                        trace!("received node status event : {:?}", status);
+                        log::trace!("received node status event : {:?}", status);
 
                         match orchestrator
                             .lock()
                             .await
-                            .update_node_status(status.id.clone(), status)
+                            .update_node_status(status.id.clone(), status.clone())
                             .await
                         {
                             Ok(_) => {
-                                info!("successfully updated node status");
+                                log::debug!("successfully updated node status : {:?}", status.id);
+
                                 tx.send(Ok(())).await.unwrap();
                             }
                             Err(err) => {
-                                info!("error while updating node status : {:?}", err);
+                                log::info!(
+                                    "error while updating node status : {:?} ({:?})",
+                                    status.id,
+                                    err
+                                );
+
                                 tx.send(Err(tonic::Status::internal(format!(
                                     "Error thrown by the orchestrator: {:?}",
                                     err
@@ -294,29 +319,27 @@ impl Manager {
     async fn connect_to_controller(&mut self) -> Result<(), ProxyError> {
         let addr = format!(
             "http://{}:{}",
-            self.config.controller.host.clone(),
-            self.config.controller.port.clone()
+            self.config.controller.host, self.config.controller.port
         );
+
+        log::info!("connecting to controller at {} ...", addr);
 
         let client = NodeServiceClient::connect(addr)
             .await
             .map_err(ProxyError::TonicTransportError)?;
 
+        log::info!("successfully connected to controller");
         self.grpc_controller_client = Arc::new(Mutex::new(Some(client)));
         Ok(())
     }
 
-    /// The function creates a channel to communicate with the orchestrator, creates a gRPC server and a
-    /// listener for incoming events, and then waits for the end of all the threads
-    ///
-    /// Returns:
-    ///
-    /// A Result<(), Box<dyn std::error::Error>>
     pub async fn run(&mut self) -> Result<(), ManagerError> {
+        // connect to the controller
         self.connect_to_controller()
             .await
-            .map_err(|err| ManagerError::CannotConnectToController(err))?;
+            .map_err(ManagerError::CannotConnectToController)?;
 
+        // create the threads for the gRPC server & the events
         let mut handlers = vec![];
         let (tx, rx) = Self::create_mpsc_channel();
 
@@ -326,7 +349,7 @@ impl Manager {
         // listen for incoming events and pass them to the orchestrator
         handlers.push(self.listen_events(rx));
 
-        info!("scheduler running and ready to receive incoming requests ...");
+        log::info!("scheduler running and ready to receive incoming requests ...");
 
         // wait the end of all the threads
         for handler in handlers {

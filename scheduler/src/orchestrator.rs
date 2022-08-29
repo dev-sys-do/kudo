@@ -1,6 +1,6 @@
 use std::{net::IpAddr, sync::Arc};
 
-use log::{debug, info};
+use log;
 use proto::{
     controller::node_service_client::NodeServiceClient,
     scheduler::{Instance, InstanceStatus, NodeStatus, Resource, ResourceSummary, Status},
@@ -78,6 +78,12 @@ impl Orchestrator {
             .get_mut(&target_node_id)
             .ok_or(OrchestratorError::NodeNotFound)?; // should never be None
 
+        log::info!(
+            "instance {:?} is assigned on node {:?}",
+            instance_proxied.instance.id,
+            target_node_id
+        );
+
         // create the instance on the node
         let stream = target_node
             .create_instance(instance_proxied.instance.clone())
@@ -88,7 +94,10 @@ impl Orchestrator {
         instance_proxied
             .change_status(
                 Status::Scheduled,
-                Some(format!("Instance is scheduled on node: {}", target_node_id)),
+                Some(format!(
+                    "Instance is scheduled on node: {:?}",
+                    target_node_id
+                )),
             )
             .await
             .map_err(OrchestratorError::FromProxyError)?;
@@ -190,7 +199,7 @@ impl Orchestrator {
         controller_client: Arc<Mutex<Option<NodeServiceClient<tonic::transport::Channel>>>>,
     ) -> Result<(), OrchestratorError> {
         let mut node_proxied = NodeProxied::new(node.id.clone(), node, addr);
-        debug!("registering node: {:?}", node_proxied);
+        log::debug!("registering node: {:?}", node_proxied);
 
         // connect to node agent grpc service
         node_proxied
@@ -270,7 +279,7 @@ impl Orchestrator {
     ///
     /// A Result<NodeIdentifier, OrchestratorError>
     pub fn find_best_node(&self, instance: &Instance) -> Result<NodeIdentifier, OrchestratorError> {
-        debug!("Finding best node for instance: {:?}", instance);
+        log::debug!("Finding best node for instance: {:?}", instance);
 
         let nodes = self.nodes.get_all();
 
@@ -280,7 +289,6 @@ impl Orchestrator {
             .collect();
 
         if started_nodes.len() == 0 {
-            debug!("No nodes available");
             return Err(OrchestratorError::NoAvailableNodes);
         }
 
@@ -301,18 +309,7 @@ impl Orchestrator {
             }
         }
 
-        match best_node_id {
-            Some(node_id) => {
-                info!(
-                    "scheduling instance {:?} on node: {:?}",
-                    instance.id.clone(),
-                    node_id
-                );
-
-                return Ok(node_id);
-            }
-            None => Err(OrchestratorError::NotEnoughResources),
-        }
+        best_node_id.ok_or(OrchestratorError::NotEnoughResources)
     }
 
     /// It takes a node and an instance and returns a score for the node based on the resources of the

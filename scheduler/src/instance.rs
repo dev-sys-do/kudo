@@ -1,4 +1,5 @@
-use log::debug;
+use anyhow::Result;
+use log;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response};
@@ -27,7 +28,7 @@ impl InstanceService for InstanceListener {
         &self,
         request: Request<Instance>,
     ) -> Result<Response<Self::CreateStream>, tonic::Status> {
-        debug!("received request: {:?}", request);
+        log::debug!("received gRPC request: {:?}", request);
         let (tx, rx) = Manager::create_mpsc_channel();
 
         match self
@@ -54,7 +55,7 @@ impl InstanceService for InstanceListener {
         &self,
         request: Request<InstanceIdentifier>,
     ) -> Result<Response<()>, tonic::Status> {
-        debug!("received request: {:?}", request);
+        log::debug!("received gRPC request: {:?}", request);
         let (tx, rx) = Manager::create_oneshot_channel();
 
         match self
@@ -75,7 +76,7 @@ impl InstanceService for InstanceListener {
         &self,
         request: Request<InstanceIdentifier>,
     ) -> Result<Response<()>, tonic::Status> {
-        debug!("received request: {:?}", request);
+        log::debug!("received gRPC request: {:?}", request);
         let (tx, rx) = Manager::create_oneshot_channel();
 
         match self

@@ -1,6 +1,6 @@
 use std::{net::IpAddr, sync::Arc};
 
-use log::debug;
+use log;
 use proto::{
     agent::{instance_service_client::InstanceServiceClient, Signal, SignalInstruction},
     controller::node_service_client::NodeServiceClient,
@@ -42,33 +42,33 @@ impl NodeService for NodeListener {
         &self,
         request: Request<Streaming<NodeStatus>>,
     ) -> Result<Response<()>, tonic::Status> {
-        let mut stream = request.into_inner();
-        let (tx, mut rx) = Manager::create_mpsc_channel();
+        log::debug!("received gRPC request: {:?}", request);
 
+        let mut stream = request.into_inner();
+
+        // send each status to the manager
         loop {
+            let (tx, mut rx) = Manager::create_mpsc_channel();
             let message = stream.message().await?;
+
             match message {
                 Some(node_status) => {
-                    debug!("Node status: {:?}", node_status);
                     self.sender
                         .send(Event::NodeStatus(node_status, tx.clone()))
                         .await
                         .unwrap();
 
+                    // wait for the manager to respond
                     if let Some(res) = rx.recv().await {
                         match res {
-                            Ok(()) => {
-                                debug!("Node status updated successfully");
-                            }
-                            Err(err) => {
-                                debug!("Error updating node status: {:?}", err);
-                                return Err(err);
-                            }
+                            Ok(_) => {}
+                            Err(err) => return Err(err),
                         }
                     }
                 }
                 None => {
-                    debug!("Node status stream closed");
+                    log::error!("Node status stream closed");
+                    // todo: emit node crash event (get the node id from the first status)
                     return Ok(Response::new(()));
                 }
             }
@@ -79,11 +79,11 @@ impl NodeService for NodeListener {
         &self,
         request: Request<NodeRegisterRequest>,
     ) -> Result<Response<NodeRegisterResponse>, tonic::Status> {
-        debug!("{:?}", request);
+        log::debug!("received gRPC request: {:?}", request);
+
         let (tx, rx) = Manager::create_oneshot_channel();
         let remote_addr = request.remote_addr().unwrap().ip();
-
-        debug!("Registering node from ip: {:?}", remote_addr);
+        log::debug!("Registering a new node from: {:?}", remote_addr);
 
         match self
             .sender
@@ -103,7 +103,8 @@ impl NodeService for NodeListener {
         &self,
         request: Request<NodeUnregisterRequest>,
     ) -> Result<Response<NodeUnregisterResponse>, tonic::Status> {
-        debug!("{:?}", request);
+        log::debug!("received gRPC request: {:?}", request);
+
         let (tx, rx) = Manager::create_oneshot_channel();
 
         match self
@@ -181,7 +182,8 @@ impl NodeProxied {
                 }
             }
 
-            debug!("Node status stream closed");
+            log::debug!("Node status stream closed");
+            // todo: emit node crash event (get the node id from the first status)
         };
 
         let request = Self::wrap_request(node_status_stream);
