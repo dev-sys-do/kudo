@@ -12,6 +12,12 @@ pub struct Config {
     pub port: u16,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AgentConfig {
+    pub host: String,
+    pub port: u16,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Config {

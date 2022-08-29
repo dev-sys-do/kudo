@@ -4,7 +4,7 @@ use anyhow::Result;
 use log::{debug, info};
 use proto::scheduler::{
     instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
-    InstanceStatus, NodeRegisterResponse, Status,
+    InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse, Status,
 };
 use tokio::sync::{mpsc, oneshot};
 use tokio::{sync::Mutex, task::JoinHandle};
@@ -32,10 +32,12 @@ impl Manager {
     pub fn new(config: Config) -> Self {
         let instances = Storage::new();
         let nodes = Storage::new();
-        let orchestrator = Orchestrator::new(instances, nodes);
+        let config = Arc::new(config);
+
+        let orchestrator = Orchestrator::new(instances, nodes, config.clone());
 
         Manager {
-            config: Arc::new(config),
+            config,
             orchestrator: Arc::new(Mutex::new(orchestrator)),
         }
     }
@@ -139,7 +141,7 @@ impl Manager {
                     Event::InstanceStart(id, tx) => {
                         info!("received instance start event : {:?}", id);
 
-                        match orchestrator.lock().await.start_instance(id.clone()) {
+                        match orchestrator.lock().await.start_instance(id.clone()).await {
                             Ok(_) => {
                                 info!("started instance : {:?}", id);
                                 tx.send(Ok(Response::new(()))).unwrap();
@@ -220,6 +222,35 @@ impl Manager {
                                         err
                                     ),
                                     subnet: "".to_string(),
+                                };
+
+                                tx.send(Ok(tonic::Response::new(response))).unwrap();
+                            }
+                        };
+                    }
+                    Event::NodeUnregister(request, tx) => {
+                        info!("received node unregister event : {:?}", request);
+
+                        match orchestrator.lock().await.unregister_node(request.id) {
+                            Ok(_) => {
+                                info!("successfully unregistered node");
+
+                                let response = NodeUnregisterResponse {
+                                    code: 0,
+                                    description: "Bye from the cluster".to_string(),
+                                };
+
+                                tx.send(Ok(tonic::Response::new(response))).unwrap();
+                            }
+                            Err(err) => {
+                                info!("error while unregistering node : {:?}", err);
+
+                                let response = NodeUnregisterResponse {
+                                    code: 1,
+                                    description: format!(
+                                        "Error thrown by the orchestrator: {:?}",
+                                        err
+                                    ),
                                 };
 
                                 tx.send(Ok(tonic::Response::new(response))).unwrap();
