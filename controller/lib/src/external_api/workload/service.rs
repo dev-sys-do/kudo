@@ -1,8 +1,8 @@
 use std::net::SocketAddr;
 
-use super::filter::FilterService;
 use super::model::{Ressources, Type, Workload, WorkloadDTO, WorkloadError, WorkloadVector};
 use crate::etcd::EtcdClient;
+use crate::external_api::generic::filter::FilterService;
 use serde_json;
 
 /// `WorkloadService` is a struct that inpired from Controllers Provider Modules architectures. It can be used as a service in the WorkloadController .A service can use other services.
