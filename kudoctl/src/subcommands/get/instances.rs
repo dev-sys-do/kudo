@@ -14,7 +14,7 @@ pub async fn execute(
     show_header: bool,
 ) -> Result<String> {
     let client = Client::new(conf).context("Error creating client")?;
-    let mut result = client::instance::list(&client).await?;
+    let mut result = client::instance::list(&client, &conf.namespace).await?;
     result.show_header = show_header;
     output::format_output(result, format)
 }
