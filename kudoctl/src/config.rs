@@ -30,6 +30,7 @@ pub fn get_verbosity_level_from_string(verbosity_level_str: &str) -> LevelFilter
         "warn" => LevelFilter::Warn,
         "info" => LevelFilter::Info,
         "debug" => LevelFilter::Debug,
+        "trace" => LevelFilter::Trace,
         _ => LevelFilter::Info,
     }
 }
