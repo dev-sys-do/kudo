@@ -2,6 +2,7 @@ use crate::config;
 use anyhow::Result;
 use clap::{Args, ValueEnum};
 mod instance;
+mod namespace;
 mod resource;
 
 #[derive(Debug, Args)]
@@ -23,6 +24,9 @@ enum Subjects {
 
     /// instances
     Instance,
+
+    /// namespaces
+    Namespace,
 }
 
 /// match the subcommand to get the correct info
@@ -30,6 +34,7 @@ pub async fn execute(args: Subcommand, conf: &config::Config) -> Result<String> 
     match args.subject {
         Subjects::Resource => resource::execute(conf, args.id.as_str()).await,
         Subjects::Instance => instance::execute(conf, args.id.as_str()).await,
+        Subjects::Namespace => namespace::execute(conf, args.id.as_str()).await,
     }?;
 
     Ok(String::new())

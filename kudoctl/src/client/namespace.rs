@@ -32,3 +32,13 @@ pub async fn list(client: &Client) -> Result<GetNamespacesResponse> {
     );
     Ok(response)
 }
+
+/// Delete an namespace with the given id.
+pub async fn delete(client: &Client, name: &str) -> anyhow::Result<()> {
+    (*client)
+        .send_json_request::<(), ()>(&format!("/namespace/{}", name), Method::DELETE, None)
+        .await
+        .context("Error deleting namespace")?;
+    debug!("Namespace {} deleted", name);
+    Ok(())
+}
