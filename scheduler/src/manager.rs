@@ -24,7 +24,7 @@ pub struct Manager {
 }
 
 impl Manager {
-    /// `new` creates a new `Manager` struct with two empty `Storage` structs
+    /// The `new` function creates a new `Manager` struct with two empty `Storage` structs and a new `Orchestrator` struct.
     ///
     /// Returns:
     ///
@@ -63,7 +63,7 @@ impl Manager {
     /// * `tx`: mpsc::Sender<Event>
     ///
     /// Returns:
-    ///
+    /// 
     /// A JoinHandle<()>
     fn create_grpc_server(&self, tx: mpsc::Sender<Event>) -> Result<JoinHandle<()>> {
         info!("creating grpc server ...");
