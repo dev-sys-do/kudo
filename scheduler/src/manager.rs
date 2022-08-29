@@ -1,6 +1,8 @@
 use anyhow::Result;
 use proto::controller::node_service_client::NodeServiceClient;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::time;
 
 use log;
 use proto::scheduler::{
@@ -13,12 +15,12 @@ use tonic::{transport::Server, Response};
 use uuid::Uuid;
 
 use crate::node::Node;
+use crate::ManagerError;
 use crate::SchedulerError;
 use crate::{
     config::Config, instance::InstanceListener, node::NodeListener, orchestrator::Orchestrator,
     storage::Storage, Event,
 };
-use crate::{ManagerError, ProxyError};
 
 #[derive(Debug)]
 pub struct Manager {
@@ -318,7 +320,7 @@ impl Manager {
         })
     }
 
-    async fn connect_to_controller(&mut self) -> Result<(), ProxyError> {
+    async fn connect_to_controller(&mut self) {
         let addr = format!(
             "http://{}:{}",
             self.config.controller.host, self.config.controller.port
@@ -326,20 +328,26 @@ impl Manager {
 
         log::info!("connecting to controller at {} ...", addr);
 
-        let client = NodeServiceClient::connect(addr)
-            .await
-            .map_err(ProxyError::TonicTransportError)?;
+        let mut interval = time::interval(Duration::from_secs(5));
+        loop {
+            match NodeServiceClient::connect(addr.clone()).await {
+                Ok(client) => {
+                    self.grpc_controller_client = Arc::new(Mutex::new(Some(client)));
+                    break;
+                }
+                Err(err) => {
+                    log::error!("error while connecting to controller : {:?}", err);
+                }
+            }
+            interval.tick().await;
+        }
 
         log::info!("successfully connected to controller");
-        self.grpc_controller_client = Arc::new(Mutex::new(Some(client)));
-        Ok(())
     }
 
     pub async fn run(&mut self) -> Result<()> {
         // connect to the controller
-        self.connect_to_controller()
-            .await
-            .map_err(ManagerError::CannotConnectToController)?;
+        self.connect_to_controller().await;
 
         // create the threads for the gRPC server & the events
         let mut handlers = vec![];
