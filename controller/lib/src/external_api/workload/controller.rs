@@ -1,7 +1,8 @@
 use crate::external_api::interface::ActixAppState;
 
+use super::model::WorkloadDTO;
 use super::service::WorkloadService;
-use super::{model::Pagination, model::WorkloadDTO};
+use crate::external_api::generic::model::Pagination;
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpResponse, Responder, Scope};
 pub struct WorkloadController {}
