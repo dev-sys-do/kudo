@@ -13,6 +13,7 @@ pub mod instance;
 pub mod manager;
 pub mod node;
 pub mod orchestrator;
+pub mod parser;
 pub mod storage;
 
 #[derive(Error, Debug)]
@@ -34,6 +35,7 @@ pub enum ProxyError {
     TonicTransportError(tonic::transport::Error),
     TonicStatusError(tonic::Status),
     GrpcClientNotFound,
+    GrpcStreamNotFound,
     ChannelSenderError,
     InvalidStatus,
 }

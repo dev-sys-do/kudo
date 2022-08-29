@@ -4,7 +4,7 @@ use log::{debug, info};
 use scheduler::{config::Config, manager::Manager, SchedulerError};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), ManagerError> {
     env_logger::init();
     info!("starting up");
 
@@ -17,7 +17,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         confy::load_path(dir.as_path()).map_err(SchedulerError::ConfigReadError)?;
     debug!("config: {:?}", config);
 
-    let manager = Manager::new(config);
+    let mut manager = Manager::new(config);
     debug!("initialized manager struct with data : {:?}", manager);
 
     manager.run().await?;

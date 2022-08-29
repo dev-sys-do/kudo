@@ -13,7 +13,7 @@ pub struct Config {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct AgentConfig {
+pub struct ControllerConfig {
     pub host: String,
     pub port: u16,
 }

@@ -1,8 +1,11 @@
 use std::{net::IpAddr, sync::Arc};
 
 use log::{debug, info};
-use proto::scheduler::{Instance, InstanceStatus, NodeStatus, Resource, ResourceSummary, Status};
-use tokio::sync::mpsc;
+use proto::{
+    controller::node_service_client::NodeServiceClient,
+    scheduler::{Instance, InstanceStatus, NodeStatus, Resource, ResourceSummary, Status},
+};
+use tokio::sync::{mpsc, Mutex};
 use tonic::Streaming;
 
 use crate::{
@@ -184,6 +187,7 @@ impl Orchestrator {
         &mut self,
         node: Node,
         addr: IpAddr,
+        controller_client: Arc<Mutex<Option<NodeServiceClient<tonic::transport::Channel>>>>,
     ) -> Result<(), OrchestratorError> {
         let mut node_proxied = NodeProxied::new(node.id.clone(), node, addr);
         debug!("registering node: {:?}", node_proxied);
@@ -191,6 +195,11 @@ impl Orchestrator {
         // connect to node agent grpc service
         node_proxied
             .connect_to_grpc()
+            .await
+            .map_err(OrchestratorError::FromProxyError)?;
+
+        node_proxied
+            .open_node_status_stream(controller_client)
             .await
             .map_err(OrchestratorError::FromProxyError)?;
 

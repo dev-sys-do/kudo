@@ -7,6 +7,7 @@ use proto::scheduler::{
     InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse, Status,
 };
 use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinError;
 use tokio::{sync::Mutex, task::JoinHandle};
 use tonic::{transport::Server, Response};
 use uuid::Uuid;
@@ -18,9 +19,16 @@ use crate::{
 };
 
 #[derive(Debug)]
+pub enum ManagerError {
+    CannotConnectToController(ProxyError),
+    FromTaskError(JoinError),
+}
+
+#[derive(Debug)]
 pub struct Manager {
     config: Arc<Config>,
     orchestrator: Arc<Mutex<Orchestrator>>,
+    grpc_controller_client: Arc<Mutex<Option<NodeServiceClient<tonic::transport::Channel>>>>,
 }
 
 impl Manager {
@@ -39,6 +47,7 @@ impl Manager {
         Manager {
             config,
             orchestrator: Arc::new(Mutex::new(orchestrator)),
+            grpc_controller_client: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -108,6 +117,7 @@ impl Manager {
     fn listen_events(&self, mut rx: mpsc::Receiver<Event>) -> JoinHandle<()> {
         info!("listening for incoming events ...");
         let orchestrator = Arc::clone(&self.orchestrator);
+        let controller_client = self.grpc_controller_client.clone();
 
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
@@ -190,7 +200,12 @@ impl Manager {
 
                         debug!("registered node : {:?}", node);
 
-                        match orchestrator.lock().await.register_node(node, addr).await {
+                        match orchestrator
+                            .lock()
+                            .await
+                            .register_node(node, addr, controller_client.clone())
+                            .await
+                        {
                             Ok(_) => {
                                 info!("successfully registered node");
 
@@ -276,13 +291,32 @@ impl Manager {
         })
     }
 
+    async fn connect_to_controller(&mut self) -> Result<(), ProxyError> {
+        let addr = format!(
+            "http://{}:{}",
+            self.config.controller.host.clone(),
+            self.config.controller.port.clone()
+        );
+
+        let client = NodeServiceClient::connect(addr)
+            .await
+            .map_err(ProxyError::TonicTransportError)?;
+
+        self.grpc_controller_client = Arc::new(Mutex::new(Some(client)));
+        Ok(())
+    }
+
     /// The function creates a channel to communicate with the orchestrator, creates a gRPC server and a
     /// listener for incoming events, and then waits for the end of all the threads
     ///
     /// Returns:
     ///
     /// A Result<(), Box<dyn std::error::Error>>
-    pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn run(&mut self) -> Result<(), ManagerError> {
+        self.connect_to_controller()
+            .await
+            .map_err(|err| ManagerError::CannotConnectToController(err))?;
+
         let mut handlers = vec![];
         let (tx, rx) = Self::create_mpsc_channel();
 
@@ -296,7 +330,7 @@ impl Manager {
 
         // wait the end of all the threads
         for handler in handlers {
-            handler.await?;
+            handler.await.map_err(ManagerError::FromTaskError)?;
         }
 
         Ok(())

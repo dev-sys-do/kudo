@@ -12,6 +12,7 @@ env_logger = "0.8.4"
 tonic = "0.7.2"
 tokio = { version = "1.0", features = [ "rt-multi-thread", "time", "fs", "macros", "net",] }
 tokio-stream = { version = "0.1", features = ["net"] }
+async-stream = "0.3.3"
 uuid = { version="1.1.2", features = ["v4"] }
 serde = "1.0.142"
 serde_derive = "1.0.142"

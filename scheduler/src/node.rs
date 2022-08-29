@@ -1,17 +1,22 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, sync::Arc};
 
 use log::debug;
 use proto::{
     agent::{instance_service_client::InstanceServiceClient, Signal, SignalInstruction},
+    controller::node_service_client::NodeServiceClient,
     scheduler::{
         node_service_server::NodeService, Instance, NodeRegisterRequest, NodeRegisterResponse,
         NodeStatus, NodeUnregisterRequest, NodeUnregisterResponse, Resource, Status,
     },
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use tonic::{Request, Response, Streaming};
 
-use crate::{instance::InstanceParser, manager::Manager, Event, InstanceIdentifier, ProxyError};
+use crate::{
+    manager::Manager,
+    parser::{InstanceParser, ResourceParser},
+    Event, InstanceIdentifier, ProxyError,
+};
 
 #[derive(Debug, Clone)]
 pub struct Node {
@@ -63,6 +68,7 @@ impl NodeService for NodeListener {
                     }
                 }
                 None => {
+                    debug!("Node status stream closed");
                     return Ok(Response::new(()));
                 }
             }
@@ -120,8 +126,9 @@ pub struct NodeProxied {
     pub id: String,
     pub node: Node,
     pub address: IpAddr,
-    pub tx: Option<mpsc::Sender<Result<NodeStatus, tonic::Status>>>,
+    pub tx: Option<mpsc::Sender<Result<proto::controller::NodeStatus, tonic::Status>>>,
     pub grpc_client: Option<InstanceServiceClient<tonic::transport::Channel>>,
+    pub instances: Vec<Instance>,
 }
 
 impl NodeProxied {
@@ -132,6 +139,7 @@ impl NodeProxied {
             address,
             tx: None,
             grpc_client: None,
+            instances: Vec::new(),
         }
     }
 
@@ -146,28 +154,81 @@ impl NodeProxied {
         Ok(())
     }
 
+    pub async fn open_node_status_stream(
+        &mut self,
+        client: Arc<Mutex<Option<NodeServiceClient<tonic::transport::Channel>>>>,
+    ) -> Result<(), ProxyError> {
+        if self.tx.is_some() {
+            return Ok(());
+        }
+
+        let (tx, mut rx) = Manager::create_mpsc_channel();
+        self.tx = Some(tx);
+
+        let node_status_stream = async_stream::stream! {
+            loop {
+                let event = rx.recv().await;
+                match event {
+                    Some(Ok(node_status)) => {
+                        yield node_status;
+                    }
+                    Some(Err(_)) => {
+                        break;
+                    }
+                    None => {
+                        break;
+                    }
+                }
+            }
+
+            debug!("Node status stream closed");
+        };
+
+        let request = Self::wrap_request(node_status_stream);
+
+        tokio::spawn(async move {
+            client
+                .lock()
+                .await
+                .as_mut()
+                .unwrap()
+                .update_node_status(request)
+                .await
+        });
+
+        Ok(())
+    }
+
     pub async fn update_status(
         &mut self,
         status: Status,
-        _: Option<String>,
+        description: Option<String>,
         resource: Option<Resource>,
     ) -> Result<(), ProxyError> {
         self.node.status = status;
         self.node.resource = resource;
 
-        // todo;
-        // self.tx
-        //     .send(Ok(InstanceStatus {
-        //         id: Uuid::new_v4().to_string(),
-        //         status: status.into(),
-        //         status_description: description.unwrap_or("".to_string()),
-        //         resource: match Status::from_i32(self.instance.status) {
-        //             Some(Status::Running) => self.instance.resource.clone(),
-        //             _ => None,
-        //         },
-        //     }))
-        //     .await
-        //     .map_err(|_| ProxyError::ChannelSenderError)?;
+        self.tx
+            .as_mut()
+            .ok_or(ProxyError::GrpcStreamNotFound)?
+            .send(Ok(proto::controller::NodeStatus {
+                id: self.id.clone(),
+                state: self.node.status.into(),
+                status_description: description.unwrap_or("".to_string()),
+                resource: match self.node.status {
+                    Status::Running => Some(ResourceParser::to_controller_resource(
+                        self.node.resource.clone().unwrap(),
+                    )),
+                    _ => None,
+                },
+                instances: self
+                    .instances
+                    .iter()
+                    .map(|instance| InstanceParser::fake_controller_instance(instance.id.clone()))
+                    .collect(),
+            }))
+            .await
+            .map_err(|_| ProxyError::ChannelSenderError)?;
 
         Ok(())
     }
