@@ -1,12 +1,13 @@
 use log::{info, debug};
-use proto::scheduler::{Instance, NodeStatus};
+use proto::scheduler::{Instance, NodeStatus, Status};
 
-use crate::{storage::{Storage, IStorage}, Node, NodeIdentifier};
+use crate::{storage::{Storage, IStorage}, Node, NodeIdentifier, InstanceIdentifier};
 
 #[derive(Debug)]
 pub enum OrchestratorError {
     NoAvailableNodes,
     NodeNotFound,
+    InstanceNotFound,
 }
 
 #[derive(Debug)]
@@ -22,6 +23,45 @@ impl Orchestrator {
             instances,
             nodes
         }
+    }
+
+    pub fn start_instance(&self, id: InstanceIdentifier) -> Result<(), OrchestratorError> {
+        let instance = self.instances.get(&id).ok_or(OrchestratorError::InstanceNotFound)?;
+
+        // check if instance is already running
+        if instance.status() == Status::Running || instance.status() == Status::Starting {
+            return Ok(());
+        }
+
+        // todo: start instance from node agent's api
+
+        Ok(())
+    }
+
+    pub fn stop_instance(&self, id: InstanceIdentifier) -> Result<(), OrchestratorError> {
+        let instance = self.instances.get(&id).ok_or(OrchestratorError::InstanceNotFound)?;
+
+        // check if instance is already stopped
+        if instance.status() == Status::Stopped || instance.status() == Status::Stopping {
+            return Ok(());
+        }
+
+        // todo: stop instance from node agent's api
+
+        Ok(())
+    }
+
+    pub fn destroy_instance(&self, id: InstanceIdentifier) -> Result<(), OrchestratorError> {
+        let instance = self.instances.get(&id).ok_or(OrchestratorError::InstanceNotFound)?;
+
+        // check if instance is already stopped
+        if instance.status() == Status::Destroying || instance.status() == Status::Terminated {
+            return Ok(());
+        }
+
+        // todo: destroy instance from node agent's api
+
+        Ok(())
     }
 
     pub fn register_node(&mut self, node: Node) -> Result<(), OrchestratorError> {

@@ -8,7 +8,7 @@ use proto::scheduler::{
 };
 use tokio::sync::{mpsc, oneshot};
 use tokio::{sync::Mutex, task::JoinHandle};
-use tonic::transport::Server;
+use tonic::{transport::Server, Response};
 use uuid::Uuid;
 
 use crate::SchedulerError;
@@ -136,14 +136,59 @@ impl Manager {
                             }
                         };
                     }
-                    Event::InstanceStart(instance) => {
-                        info!("received instance start event : {:?}", instance);
+                    Event::InstanceStart(id, tx) => {
+                        info!("received instance start event : {:?}", id);
+
+                        match orchestrator.lock().await.start_instance(id.clone()) {
+                            Ok(_) => {
+                                info!("started instance : {:?}", id);
+                                tx.send(Ok(Response::new(()))).unwrap();
+                            }
+                            Err(err) => {
+                                info!("error while starting instance : {:?}", err);
+                                tx.send(Err(tonic::Status::internal(format!(
+                                    "Error thrown by the orchestrator: {:?}",
+                                    err
+                                ))))
+                                .unwrap();
+                            }
+                        };
                     }
-                    Event::InstanceStop(instance) => {
-                        info!("received instance stop event : {:?}", instance);
+                    Event::InstanceStop(id, tx) => {
+                        info!("received instance stop event : {:?}", id);
+
+                        match orchestrator.lock().await.stop_instance(id.clone()) {
+                            Ok(_) => {
+                                info!("stopped instance : {:?}", id);
+                                tx.send(Ok(Response::new(()))).unwrap();
+                            }
+                            Err(err) => {
+                                info!("error while stopping instance : {:?}", err);
+                                tx.send(Err(tonic::Status::internal(format!(
+                                    "Error thrown by the orchestrator: {:?}",
+                                    err
+                                ))))
+                                .unwrap();
+                            }
+                        };
                     }
-                    Event::InstanceDestroy(instance) => {
-                        info!("received instance destroy event : {:?}", instance);
+                    Event::InstanceDestroy(id, tx) => {
+                        info!("received instance destroy event : {:?}", id);
+
+                        match orchestrator.lock().await.destroy_instance(id.clone()) {
+                            Ok(_) => {
+                                info!("destroyed instance : {:?}", id);
+                                tx.send(Ok(Response::new(()))).unwrap();
+                            }
+                            Err(err) => {
+                                info!("error while destroying instance : {:?}", err);
+                                tx.send(Err(tonic::Status::internal(format!(
+                                    "Error thrown by the orchestrator: {:?}",
+                                    err
+                                ))))
+                                .unwrap();
+                            }
+                        };
                     }
                     Event::NodeRegister(request, tx) => {
                         info!("received node register event : {:?}", request);
@@ -180,23 +225,28 @@ impl Manager {
                                 tx.send(Ok(tonic::Response::new(response))).unwrap();
                             }
                         };
-                    },
+                    }
                     Event::NodeStatus(status, tx) => {
                         info!("received node status event : {:?}", status);
 
-                        match orchestrator.lock().await.update_node_status(status.id.clone(), status) {
+                        match orchestrator
+                            .lock()
+                            .await
+                            .update_node_status(status.id.clone(), status)
+                        {
                             Ok(_) => {
                                 info!("successfully updated node status");
                                 tx.send(Ok(())).await.unwrap();
-                            },
+                            }
                             Err(err) => {
                                 info!("error while updating node status : {:?}", err);
-                                tx.send(Err(
-                                    tonic::Status::internal(
-                                        format!("Error thrown by the orchestrator: {:?}", err)
-                                    )
-                                )).await.unwrap();
-                            },
+                                tx.send(Err(tonic::Status::internal(format!(
+                                    "Error thrown by the orchestrator: {:?}",
+                                    err
+                                ))))
+                                .await
+                                .unwrap();
+                            }
                         };
                     }
                 }

@@ -10,9 +10,8 @@ pub mod config;
 pub mod instance_listener;
 pub mod manager;
 pub mod node_listener;
-pub mod storage;
 pub mod orchestrator;
-pub mod config;
+pub mod storage;
 
 #[derive(Error, Debug)]
 pub enum SchedulerError {
@@ -35,6 +34,7 @@ pub struct Node {
 }
 
 pub type NodeIdentifier = String;
+pub type InstanceIdentifier = String;
 
 #[derive(Debug)]
 pub enum Event {
