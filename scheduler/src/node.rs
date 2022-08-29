@@ -145,7 +145,7 @@ impl NodeProxied {
     }
 
     pub async fn connect_to_grpc(&mut self) -> Result<(), ProxyError> {
-        let addr = format!("http://{}:{}", self.address.to_string(), "50053");
+        let addr = format!("http://{}:{}", self.address, "50053");
 
         let client = InstanceServiceClient::connect(addr)
             .await
@@ -216,7 +216,7 @@ impl NodeProxied {
             .send(Ok(proto::controller::NodeStatus {
                 id: self.id.clone(),
                 state: self.node.status.into(),
-                status_description: description.unwrap_or("".to_string()),
+                status_description: description.unwrap_or_else(|| "".to_string()),
                 resource: match self.node.status {
                     Status::Running => Some(ResourceParser::to_controller_resource(
                         self.node.resource.clone().unwrap(),

@@ -44,7 +44,7 @@ impl Orchestrator {
         Orchestrator {
             instances,
             nodes,
-            config: config.clone(),
+            config,
         }
     }
 
@@ -225,13 +225,11 @@ impl Orchestrator {
 
     pub fn unregister_node(&mut self, id: NodeIdentifier) -> Result<(), OrchestratorError> {
         // Return an error if the node is not found.
-        self.nodes
-            .get(&id.clone())
-            .ok_or(OrchestratorError::NodeNotFound)?;
+        self.nodes.get(&id).ok_or(OrchestratorError::NodeNotFound)?;
 
         // todo: get instance from node and change status to Destroyed
 
-        self.nodes.delete(&id.clone());
+        self.nodes.delete(&id);
         Ok(())
     }
 
@@ -288,7 +286,7 @@ impl Orchestrator {
             .filter(|node| node.1.node.status == Status::Running)
             .collect();
 
-        if started_nodes.len() == 0 {
+        if started_nodes.is_empty() {
             return Err(OrchestratorError::NoAvailableNodes);
         }
 
@@ -468,6 +466,8 @@ mod tests {
         storage::{IStorage, Storage},
     };
 
+    use super::Orchestrator;
+
     #[test]
     fn find_best_node_enough_resources() {
         let instances: Storage<InstanceProxied> = Storage::new();
@@ -520,7 +520,7 @@ mod tests {
             },
         );
 
-        let orchestrator = super::Orchestrator::new(instances, nodes, config.clone());
+        let orchestrator = Orchestrator::new(instances, nodes, config);
 
         let instance: Instance = Instance {
             id: "instance".to_string(),
@@ -598,8 +598,6 @@ mod tests {
             },
         );
 
-        let orchestrator = super::Orchestrator::new(instances, nodes, config.clone());
-
         let instance: Instance = Instance {
             id: "instance".to_string(),
             name: "instance".to_string(),
@@ -652,11 +650,11 @@ mod tests {
             ip: "127.0.0.1".to_string(),
         };
 
-        match orchestrator.find_best_node(&instance) {
-            Ok(_) => {
-                panic!("should not find a node");
-            }
-            Err(_) => (),
-        };
+        if Orchestrator::new(instances, nodes, config)
+            .find_best_node(&instance)
+            .is_ok()
+        {
+            panic!("should not find a node");
+        }
     }
 }

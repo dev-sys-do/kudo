@@ -15,13 +15,10 @@ impl InstanceParser {
             id: instance.id,
             name: instance.name,
             r#type: instance.r#type,
-            status: instance.status.into(),
+            status: instance.status,
             uri: instance.uri,
             environment: instance.environnement,
-            resource: match instance.resource {
-                Some(r) => Some(ResourceParser::to_agent_resource(r)),
-                None => None,
-            },
+            resource: instance.resource.map(ResourceParser::to_agent_resource),
             ports: PortParser::to_agent_ports(instance.ports),
             ip: instance.ip,
         }
@@ -32,13 +29,10 @@ impl InstanceParser {
             id: instance.id,
             name: instance.name,
             r#type: instance.r#type,
-            status: instance.status.into(),
+            status: instance.status,
             uri: instance.uri,
             environnement: instance.environment,
-            resource: match instance.resource {
-                Some(r) => Some(ResourceParser::from_agent_resource(r)),
-                None => None,
-            },
+            resource: instance.resource.map(ResourceParser::from_agent_resource),
             ports: PortParser::from_agent_ports(instance.ports),
             ip: instance.ip,
         }
@@ -87,14 +81,8 @@ impl ResourceParser {
     /// A proto::agent::Resource struct
     pub fn to_agent_resource(resource: Resource) -> proto::agent::Resource {
         proto::agent::Resource {
-            limit: match resource.limit {
-                Some(r) => Some(Self::to_agent_resourcesummary(r)),
-                None => None,
-            },
-            usage: match resource.usage {
-                Some(r) => Some(Self::to_agent_resourcesummary(r)),
-                None => None,
-            },
+            limit: resource.limit.map(Self::to_agent_resourcesummary),
+            usage: resource.usage.map(Self::to_agent_resourcesummary),
         }
     }
 
@@ -109,14 +97,8 @@ impl ResourceParser {
     /// A proto::controller::Resource struct
     pub fn to_controller_resource(resource: Resource) -> proto::controller::Resource {
         proto::controller::Resource {
-            limit: match resource.limit {
-                Some(r) => Some(Self::to_controller_resourcesummary(r)),
-                None => None,
-            },
-            usage: match resource.usage {
-                Some(r) => Some(Self::to_controller_resourcesummary(r)),
-                None => None,
-            },
+            limit: resource.limit.map(Self::to_controller_resourcesummary),
+            usage: resource.usage.map(Self::to_controller_resourcesummary),
         }
     }
 
@@ -131,14 +113,8 @@ impl ResourceParser {
     /// A Resource struct
     pub fn from_agent_resource(resource: proto::agent::Resource) -> Resource {
         Resource {
-            limit: match resource.limit {
-                Some(r) => Some(Self::from_agent_resourcesummary(r)),
-                None => None,
-            },
-            usage: match resource.usage {
-                Some(r) => Some(Self::from_agent_resourcesummary(r)),
-                None => None,
-            },
+            limit: resource.limit.map(Self::from_agent_resourcesummary),
+            usage: resource.usage.map(Self::from_agent_resourcesummary),
         }
     }
 
@@ -253,12 +229,9 @@ impl StatusParser {
     pub fn from_agent_instance_status(status: proto::agent::InstanceStatus) -> InstanceStatus {
         InstanceStatus {
             id: status.id,
-            status: status.status.into(),
+            status: status.status,
             status_description: status.description,
-            resource: match status.resource {
-                Some(r) => Some(ResourceParser::from_agent_resource(r)),
-                None => None,
-            },
+            resource: status.resource.map(ResourceParser::from_agent_resource),
         }
     }
 
@@ -272,10 +245,7 @@ impl StatusParser {
             id: Uuid::new_v4().to_string(),
             state: status.status,
             status_description: status.status_description,
-            resource: match status.resource {
-                Some(r) => Some(ResourceParser::to_controller_resource(r)),
-                None => None,
-            },
+            resource: status.resource.map(ResourceParser::to_controller_resource),
             instances: vec![], // todo;
         }
     }

@@ -128,7 +128,7 @@ impl InstanceProxied {
             .send(Ok(InstanceStatus {
                 id: Uuid::new_v4().to_string(),
                 status: status.into(),
-                status_description: description.unwrap_or("".to_string()),
+                status_description: description.unwrap_or_else(|| "".to_string()),
                 resource: match self.instance.status() {
                     Status::Running => self.instance.resource.clone(),
                     _ => None,
