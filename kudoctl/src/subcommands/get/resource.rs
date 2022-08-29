@@ -1,8 +1,7 @@
 use super::output::{self, OutputFormat};
 use crate::{
-    client::{self, request::Client},
+    client::{self, request::Client, workload::WorkloadBody},
     config,
-    resource::workload::Workload,
 };
 use anyhow::{bail, Context, Result};
 use std::fmt::Display;
@@ -25,29 +24,33 @@ pub async fn execute(
     output::format_output(result, format)
 }
 
-impl Display for Workload {
+impl Display for WorkloadBody {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "name : {}\n", self.name)?;
         writeln!(f, "uri : {}\n", self.uri)?;
 
-        if let Some(ports) = &self.ports {
-            // display ports
-            let ports_str = ports
-                .iter()
-                .fold(String::new(), |acc, port| acc + &format!("{} ", port))
-                .trim()
-                .replace(' ', ",")
-                .replace(':', "->");
+        // display ports
+        let ports_str = self
+            .ports
+            .iter()
+            .fold(String::new(), |acc, port| {
+                acc + &format!("{}->{} ", port.source, port.destination)
+            })
+            .trim()
+            .replace(' ', ",");
+
+        if !ports_str.is_empty() {
             writeln!(f, "ports : {} ", ports_str)?;
         }
 
-        if let Some(env) = &self.env {
-            // display environment variables
-            let env_vars_str = env
-                .iter()
-                .fold(String::new(), |acc, env_var| acc + &format!("{} ", env_var))
-                .trim()
-                .replace(' ', ",");
+        // display environment variables
+        let env_vars_str = self
+            .environment
+            .iter()
+            .fold(String::new(), |acc, env_var| acc + &format!("{} ", env_var))
+            .trim()
+            .replace(' ', ",");
+        if !env_vars_str.is_empty() {
             writeln!(f, "env variables : {} ", env_vars_str)?;
         }
 
