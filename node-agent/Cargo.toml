@@ -7,5 +7,16 @@ edition = "2021"
 
 [dependencies]
 proto = { path = "../proto" }
-workload_manager= {path = "./workload_manager"}
-tokio = { version = "1.0", features = ["full"] }
+node_manager = { path = "./node_manager" }
+network = { path = "../network" }
+tonic = "0.7.2"
+tokio = { version = "1.20.1", features = ["full"] }
+tokio-stream = "0.1.9"
+async-stream = "0.3.3"
+env_logger = "0.9.0"
+log = "0.4.0"
+confy = "0.4.0"
+serde = "1.0.142"
+serde_derive = "1.0.142"
+uuid = { version="1.1.2", features = ["v4"] }
+cidr = "0.2.1"
