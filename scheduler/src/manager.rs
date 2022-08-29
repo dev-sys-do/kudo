@@ -10,11 +10,9 @@ use tokio::sync::mpsc;
 use tokio::{sync::oneshot, task::JoinHandle};
 use tonic::{transport::Server, Response};
 
+use crate::instance::listener::InstanceListener;
 use crate::SchedulerError;
-use crate::{
-    config::Config, instance_listener::InstanceListener, node_listener::NodeListener,
-    storage::Storage, Event, Node,
-};
+use crate::{config::Config, node_listener::NodeListener, storage::Storage, Event, Node};
 
 #[derive(Debug)]
 pub struct Manager {
