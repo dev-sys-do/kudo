@@ -5,7 +5,6 @@ pub enum WorkloadError {
     WorkloadNotFound,
     Etcd(String),
     NameAlreadyExists(String),
-    OutOfRange,
     JsonToWorkload(String),
     WorkloadToJson(String),
 }
@@ -20,7 +19,6 @@ impl WorkloadError {
             WorkloadError::NameAlreadyExists(name) => {
                 HttpResponse::Conflict().body(format!("Workload with name {} already exists", name))
             }
-            WorkloadError::OutOfRange => HttpResponse::BadRequest().body("Out of range"),
             WorkloadError::JsonToWorkload(err) => HttpResponse::InternalServerError().body(
                 format!("Error while converting JSON string to workload : {}", err),
             ),
@@ -29,11 +27,6 @@ impl WorkloadError {
             ),
         }
     }
-}
-#[derive(Deserialize, Serialize)]
-pub struct Pagination {
-    pub limit: u32,
-    pub offset: u32,
 }
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub enum Type {
