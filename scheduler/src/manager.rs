@@ -1,12 +1,15 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use anyhow::Result;
 use log::{debug, info};
+use proto::controller::node_service_client::NodeServiceClient;
 use proto::scheduler::{
     instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
     Instance, InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse,
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
+use tokio::time;
 use tokio::{sync::oneshot, task::JoinHandle};
 use tonic::{transport::Server, Response};
 
@@ -21,6 +24,7 @@ pub struct Manager {
     instances: Arc<Storage<Instance>>,
     nodes: Arc<Storage<Node>>,
     config: Arc<Config>,
+    grpc_controller_client: Arc<Mutex<Option<NodeServiceClient<tonic::transport::Channel>>>>,
 }
 
 impl Manager {
@@ -34,6 +38,7 @@ impl Manager {
             instances: Arc::new(Storage::new()),
             nodes: Arc::new(Storage::new()),
             config: Arc::new(config),
+            grpc_controller_client: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -160,18 +165,47 @@ impl Manager {
         })
     }
 
+    /// It tries to connect to the controller every 5 seconds until it succeeds
+    async fn connect_to_controller(&mut self) {
+        let addr = format!(
+            "http://{}:{}",
+            self.config.controller.host, self.config.controller.port
+        );
+
+        log::info!("connecting to controller at {} ...", addr);
+
+        let mut interval = time::interval(Duration::from_secs(5));
+        loop {
+            interval.tick().await;
+            match NodeServiceClient::connect(addr.clone()).await {
+                Ok(client) => {
+                    self.grpc_controller_client = Arc::new(Mutex::new(Some(client)));
+                    break;
+                }
+                Err(err) => {
+                    log::error!("error while connecting to controller : {:?}", err);
+                }
+            }
+        }
+
+        log::info!("successfully connected to controller");
+    }
+
     /// The function creates a channel to communicate with the orchestrator, creates a gRPC server and a
     /// listener for incoming events, and then waits for the end of all the threads
     ///
     /// Returns:
     ///
     /// A Result<(), Box<dyn std::error::Error>>
-    pub async fn run(&self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let mut handlers = vec![];
         let (tx, rx) = Self::create_mpsc_channel();
 
         // create listeners and serve the grpc server
         handlers.push(self.create_grpc_server(tx)?);
+
+        // connect to the controller
+        self.connect_to_controller().await;
 
         // listen for incoming events and pass them to the orchestrator
         handlers.push(self.listen_events(rx));
