@@ -2,9 +2,9 @@ name: Kudo CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "project-demo-202208" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "project-demo-202208" ]
 
 env:
   CARGO_TERM_COLOR: always
