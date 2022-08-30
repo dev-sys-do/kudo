@@ -71,6 +71,7 @@ pub struct WorkloadDTO {
     pub environment: Vec<String>,
     pub ports: Vec<Ports>,
     pub uri: String,
+    pub resources: Ressources,
 }
 #[derive(Deserialize, Serialize)]
 pub struct WorkloadVector {
