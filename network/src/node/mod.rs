@@ -4,7 +4,7 @@ pub mod response;
 use crate::error::KudoNetworkError;
 use crate::utils::{bridge_name, run_command};
 use default_net;
-use request::{CleanNodeRequest, SetupIptablesRequest, SetupNodeRequest};
+use request::{CleanNodeRequest, NodeRequest, SetupIptablesRequest, SetupNodeRequest};
 use response::SetupNodeResponse;
 
 /// Create a network interface and add iptables rules to make this device able to route instances
@@ -31,7 +31,172 @@ pub fn setup_node(request: SetupNodeRequest) -> Result<SetupNodeResponse, KudoNe
 
     setup_iptables(SetupIptablesRequest::new(request.node_id))?;
 
+    add_other_nodes(request.nodes_ips)?;
+
     Ok(SetupNodeResponse::new(bridge))
+}
+
+pub fn add_other_nodes(nodes: Vec<NodeRequest>) -> Result<(), KudoNetworkError> {
+    for node in nodes {
+        new_node_in_cluster(node)?;
+    }
+    Ok(())
+}
+
+/// Add iptables rules when a node joins the cluster
+pub fn new_node_in_cluster(request: NodeRequest) -> Result<(), KudoNetworkError> {
+    // Iptables rules to allow workloads to route to the node
+    run_command(
+        "iptables",
+        &[
+            "-t",
+            "nat",
+            "-I",
+            "PREROUTING",
+            "-p",
+            "tcp",
+            "-d",
+            &request.nodes_ips.cluster_ip_cidr.to_string(),
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &request.nodes_ips.external_ip_addr.to_string(),
+        ],
+    )?;
+
+    run_command(
+        "iptables",
+        &[
+            "-t",
+            "nat",
+            "-I",
+            "PREROUTING",
+            "-p",
+            "udp",
+            "-d",
+            &request.nodes_ips.cluster_ip_cidr.to_string(),
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &request.nodes_ips.external_ip_addr.to_string(),
+        ],
+    )?;
+
+    // Iptables rules to allow host machines to route to the node
+    run_command(
+        "iptables",
+        &[
+            "-t",
+            "nat",
+            "-I",
+            "OUTPUT",
+            "-p",
+            "tcp",
+            "-d",
+            &request.nodes_ips.cluster_ip_cidr.to_string(),
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &request.nodes_ips.external_ip_addr.to_string(),
+        ],
+    )?;
+
+    run_command(
+        "iptables",
+        &[
+            "-t",
+            "nat",
+            "-I",
+            "OUTPUT",
+            "-p",
+            "udp",
+            "-d",
+            &request.nodes_ips.cluster_ip_cidr.to_string(),
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &request.nodes_ips.external_ip_addr.to_string(),
+        ],
+    )?;
+
+    Ok(())
+}
+
+/// Remove iptables rules when a node leaves the cluster
+pub fn delete_node_in_cluster(request: NodeRequest) -> Result<(), KudoNetworkError> {
+    run_command(
+        "iptables",
+        &[
+            "-t",
+            "nat",
+            "-D",
+            "PREROUTING",
+            "-p",
+            "tcp",
+            "-d",
+            &request.nodes_ips.cluster_ip_cidr.to_string(),
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &request.nodes_ips.external_ip_addr.to_string(),
+        ],
+    )?;
+
+    run_command(
+        "iptables",
+        &[
+            "-t",
+            "nat",
+            "-D",
+            "PREROUTING",
+            "-p",
+            "udp",
+            "-d",
+            &request.nodes_ips.cluster_ip_cidr.to_string(),
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &request.nodes_ips.external_ip_addr.to_string(),
+        ],
+    )?;
+
+    run_command(
+        "iptables",
+        &[
+            "-t",
+            "nat",
+            "-D",
+            "OUTPUT",
+            "-p",
+            "tcp",
+            "-d",
+            &request.nodes_ips.cluster_ip_cidr.to_string(),
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &request.nodes_ips.external_ip_addr.to_string(),
+        ],
+    )?;
+
+    run_command(
+        "iptables",
+        &[
+            "-t",
+            "nat",
+            "-D",
+            "OUTPUT",
+            "-p",
+            "udp",
+            "-d",
+            &request.nodes_ips.cluster_ip_cidr.to_string(),
+            "-j",
+            "DNAT",
+            "--to-destination",
+            &request.nodes_ips.external_ip_addr.to_string(),
+        ],
+    )?;
+
+    Ok(())
 }
 
 /// Add iptables rules to route instances traffic
