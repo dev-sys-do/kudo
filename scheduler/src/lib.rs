@@ -43,12 +43,6 @@ pub enum ProxyError {
     ChannelSenderError,
 }
 
-#[derive(Debug)]
-#[allow(dead_code)]
-pub struct Node {
-    id: String,
-}
-
 pub type NodeIdentifier = String;
 pub type InstanceIdentifier = String;
 
