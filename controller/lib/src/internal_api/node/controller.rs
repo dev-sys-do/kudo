@@ -21,6 +21,11 @@ impl Display for NodeControllerError {
     }
 }
 
+/// Handles gRPC requests from the scheduler for the node service.
+///
+/// Properties:
+///
+/// * `node_service`: An instance of the NodeService that will implement the logic.
 pub struct NodeController {
     node_service: Arc<Mutex<NodeService>>,
 }
@@ -42,6 +47,15 @@ impl NodeController {
 
 #[tonic::async_trait]
 impl proto::controller::node_service_server::NodeService for NodeController {
+    /// It receives the stream sent by the scheduler and updates the persistent storage with the new node status
+    ///
+    /// # Arguments:
+    ///
+    /// * `request`: The stream of node status updates
+    ///
+    /// # Returns:
+    ///
+    /// A Result<Response<()>, Status>
     async fn update_node_status(
         &self,
         request: Request<Streaming<proto::controller::NodeStatus>>,

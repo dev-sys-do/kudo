@@ -60,6 +60,17 @@ impl NodeService {
         })
     }
 
+    /// It receives a stream of `NodeStatus` messages from the scheduler, updates the node's status in etcd,
+    /// and reschedules any instances that were running on the node if the stream is closed.
+    ///
+    /// Arguments:
+    ///
+    /// * `stream`: The stream of messages received from the scheduler.
+    /// * `remote_address`: The address of the scheduler gRPC server that is sending the status update.
+    ///
+    /// Returns:
+    ///
+    /// A `Result` with an `Ok` value of `()` or an `Err` value of `NodeServiceError`.
     pub async fn update_node_status(
         &mut self,
         mut stream: Streaming<proto::controller::NodeStatus>,
