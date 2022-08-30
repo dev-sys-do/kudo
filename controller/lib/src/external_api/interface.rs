@@ -1,3 +1,4 @@
+use super::namespace;
 use super::workload;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpResponse, HttpServer};
@@ -22,6 +23,7 @@ impl ExternalAPIInterface {
                 .app_data(web::Data::new(ActixAppState { etcd_address }))
                 .route("/health", web::get().to(HttpResponse::Ok))
                 .service(workload::controller::WorkloadController {}.services())
+                .service(namespace::controller::NamespaceController {}.services())
                 .wrap(Logger::default())
         })
         .workers(num_workers)
