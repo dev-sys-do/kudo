@@ -5,7 +5,7 @@ use proto::scheduler::{
 use tokio::sync::mpsc;
 use tonic::{Request, Response, Streaming};
 
-use crate::{manager::Manager, Event};
+use crate::{event::Event, manager::Manager};
 
 #[derive(Debug)]
 pub struct NodeListener {

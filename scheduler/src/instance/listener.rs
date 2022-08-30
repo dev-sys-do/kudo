@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response};
 
-use crate::{manager::Manager, Event};
+use crate::{event::Event, manager::Manager};
 
 #[derive(Debug)]
 pub struct InstanceListener {

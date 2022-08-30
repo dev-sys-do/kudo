@@ -6,18 +6,20 @@ use log::{debug, info};
 use proto::controller::node_service_client::NodeServiceClient;
 use proto::scheduler::{
     instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
-    InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse,
+    NodeRegisterResponse, NodeUnregisterResponse,
 };
 use tokio::sync::{mpsc, Mutex};
 use tokio::time;
 use tokio::{sync::oneshot, task::JoinHandle};
 use tonic::{transport::Server, Response};
 
+use crate::event::handlers::instance_create::InstanceCreateHandler;
+use crate::event::Event;
 use crate::instance::listener::InstanceListener;
 use crate::node::listener::NodeListener;
 use crate::orchestrator::Orchestrator;
 use crate::SchedulerError;
-use crate::{config::Config, storage::Storage, Event};
+use crate::{config::Config, storage::Storage};
 
 #[derive(Debug)]
 pub struct Manager {
@@ -118,11 +120,7 @@ impl Manager {
                 match event {
                     Event::InstanceCreate(instance, tx) => {
                         info!("received instance create event : {:?}", instance);
-                        tx.send(Ok(InstanceStatus::default())).await.unwrap();
-                    }
-                    Event::InstanceStart(id, tx) => {
-                        info!("received instance start event : {:?}", id);
-                        tx.send(Ok(Response::new(()))).unwrap();
+                        InstanceCreateHandler::handle(orchestrator.clone(), instance, tx).await;
                     }
                     Event::InstanceStop(id, tx) => {
                         info!("received instance stop event : {:?}", id);
