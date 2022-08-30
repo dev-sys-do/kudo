@@ -12,6 +12,7 @@ pub mod config;
 pub mod instance;
 pub mod manager;
 pub mod node;
+pub mod orchestrator;
 pub mod parser;
 pub mod storage;
 
@@ -41,6 +42,24 @@ pub enum ProxyError {
     GrpcStreamNotFound,
     #[error("an error occurred while sending a message to the channel")]
     ChannelSenderError,
+}
+
+#[derive(Error, Debug)]
+pub enum OrchestratorError {
+    #[error("no available nodes were found")]
+    NoAvailableNodes,
+    #[error("node not found")]
+    NodeNotFound,
+    #[error("instance not found")]
+    InstanceNotFound,
+    #[error("an network error occurred: {0}")]
+    NetworkError(String),
+    #[error("not enough resources to create the instance")]
+    NotEnoughResources,
+    #[error("an proxy error occurred: {0}")]
+    FromProxyError(ProxyError),
+    #[error("invalid workload definition")]
+    InvalidWorkload,
 }
 
 pub type NodeIdentifier = String;
