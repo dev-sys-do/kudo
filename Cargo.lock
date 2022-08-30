@@ -1387,8 +1387,20 @@ dependencies = [
 name = "node-agent"
 version = "0.1.0"
 dependencies = [
+ "async-stream",
+ "cidr",
+ "confy",
+ "env_logger 0.9.0",
+ "log",
+ "network",
+ "node_manager",
  "proto",
+ "serde",
+ "serde_derive",
  "tokio",
+ "tokio-stream",
+ "tonic",
+ "uuid",
  "workload_manager",
 ]
 
@@ -2491,6 +2503,15 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+]
+
+[[package]]
+name = "uuid"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd6469f4314d5f1ffec476e05f17cc9a78bc7a27a6a857842170bdf8d6f98d2f"
+dependencies = [
+ "getrandom",
 ]
 
 [[package]]
