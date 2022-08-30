@@ -8,7 +8,7 @@ use crate::error::KudoNetworkError;
 
 const IFACE_MAX_SIZE: usize = 12;
 
-pub(crate) fn bridge_name(node_id: String) -> String {
+pub fn bridge_name(node_id: String) -> String {
     format!("kbr{}", &node_id[..min(IFACE_MAX_SIZE, node_id.len())])
 }
 
