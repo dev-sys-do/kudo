@@ -1,15 +1,13 @@
-use log::debug;
 use proto::scheduler::{
     node_service_server::NodeService, NodeRegisterRequest, NodeRegisterResponse, NodeStatus,
     NodeUnregisterRequest, NodeUnregisterResponse,
 };
 use tokio::sync::mpsc;
-use tonic::{Request, Response, Status, Streaming};
+use tonic::{Request, Response, Streaming};
 
 use crate::{manager::Manager, Event};
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct NodeListener {
     sender: mpsc::Sender<Event>,
 }
@@ -25,33 +23,34 @@ impl NodeService for NodeListener {
     async fn status(
         &self,
         request: Request<Streaming<NodeStatus>>,
-    ) -> Result<Response<()>, Status> {
-        let mut stream = request.into_inner();
-        let (tx, mut rx) = Manager::create_mpsc_channel();
+    ) -> Result<Response<()>, tonic::Status> {
+        log::debug!("received gRPC request: {:?}", request);
 
+        let mut stream = request.into_inner();
+
+        // send each status to the manager
         loop {
+            let (tx, mut rx) = Manager::create_mpsc_channel();
             let message = stream.message().await?;
+
             match message {
                 Some(node_status) => {
-                    debug!("Node status: {:?}", node_status);
                     self.sender
                         .send(Event::NodeStatus(node_status, tx.clone()))
                         .await
                         .unwrap();
 
+                    // wait for the manager to respond
                     if let Some(res) = rx.recv().await {
                         match res {
-                            Ok(()) => {
-                                debug!("Node status updated successfully");
-                            }
-                            Err(err) => {
-                                debug!("Error updating node status: {:?}", err);
-                                return Err(err);
-                            }
+                            Ok(_) => {}
+                            Err(err) => return Err(err),
                         }
                     }
                 }
                 None => {
+                    log::error!("Node status stream closed");
+                    // todo: emit node crash event (get the node id from the first status)
                     return Ok(Response::new(()));
                 }
             }
@@ -61,20 +60,23 @@ impl NodeService for NodeListener {
     async fn register(
         &self,
         request: Request<NodeRegisterRequest>,
-    ) -> Result<Response<NodeRegisterResponse>, Status> {
-        debug!("{:?}", request);
+    ) -> Result<Response<NodeRegisterResponse>, tonic::Status> {
+        log::debug!("received gRPC request: {:?}", request);
+
         let (tx, rx) = Manager::create_oneshot_channel();
+        let remote_addr = request.remote_addr().unwrap().ip();
+        log::debug!("Registering a new node from: {:?}", remote_addr);
 
         match self
             .sender
-            .send(Event::NodeRegister(request.into_inner(), tx))
+            .send(Event::NodeRegister(request.into_inner(), remote_addr, tx))
             .await
         {
             Ok(_) => {
                 return rx.await.unwrap();
             }
             Err(_) => {
-                return Err(Status::internal("could not send event to manager"));
+                return Err(tonic::Status::internal("could not send event to manager"));
             }
         }
     }
@@ -82,8 +84,9 @@ impl NodeService for NodeListener {
     async fn unregister(
         &self,
         request: Request<NodeUnregisterRequest>,
-    ) -> Result<Response<NodeUnregisterResponse>, Status> {
-        debug!("{:?}", request);
+    ) -> Result<Response<NodeUnregisterResponse>, tonic::Status> {
+        log::debug!("received gRPC request: {:?}", request);
+
         let (tx, rx) = Manager::create_oneshot_channel();
 
         match self
@@ -95,7 +98,7 @@ impl NodeService for NodeListener {
                 return rx.await.unwrap();
             }
             Err(_) => {
-                return Err(Status::internal("could not send event to manager"));
+                return Err(tonic::Status::internal("could not send event to manager"));
             }
         }
     }

@@ -10,11 +10,10 @@ use tokio::sync::mpsc;
 use tokio::{sync::oneshot, task::JoinHandle};
 use tonic::{transport::Server, Response};
 
+use crate::instance::listener::InstanceListener;
+use crate::node::listener::NodeListener;
 use crate::SchedulerError;
-use crate::{
-    config::Config, instance_listener::InstanceListener, node_listener::NodeListener,
-    storage::Storage, Event, Node,
-};
+use crate::{config::Config, storage::Storage, Event, Node};
 
 #[derive(Debug)]
 pub struct Manager {
@@ -141,7 +140,7 @@ impl Manager {
                         info!("received instance destroy event : {:?}", id);
                         tx.send(Ok(Response::new(()))).unwrap();
                     }
-                    Event::NodeRegister(request, tx) => {
+                    Event::NodeRegister(request, _, tx) => {
                         info!("received node register event : {:?}", request);
                         tx.send(Ok(Response::new(NodeRegisterResponse::default())))
                             .unwrap();

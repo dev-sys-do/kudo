@@ -1,11 +1,9 @@
-use log::debug;
-use tokio::sync::mpsc;
-use tokio_stream::wrappers::ReceiverStream;
-use tonic::{Request, Response, Status};
-
 use proto::scheduler::{
     instance_service_server::InstanceService, Instance, InstanceIdentifier, InstanceStatus,
 };
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
+use tonic::{Request, Response};
 
 use crate::{manager::Manager, Event};
 
@@ -25,8 +23,8 @@ impl InstanceService for InstanceListener {
     async fn create(
         &self,
         request: Request<Instance>,
-    ) -> Result<Response<Self::CreateStream>, Status> {
-        debug!("received request: {:?}", request);
+    ) -> Result<Response<Self::CreateStream>, tonic::Status> {
+        log::debug!("received gRPC request: {:?}", request);
         let (tx, rx) = Manager::create_mpsc_channel();
 
         match self
@@ -38,33 +36,22 @@ impl InstanceService for InstanceListener {
                 return Ok(Response::new(ReceiverStream::new(rx)));
             }
             Err(_) => {
-                return Err(Status::internal("could not send event to manager"));
+                return Err(tonic::Status::internal("could not send event to manager"));
             }
         }
     }
 
-    type CreateStream = ReceiverStream<Result<InstanceStatus, Status>>;
+    type CreateStream = ReceiverStream<Result<InstanceStatus, tonic::Status>>;
 
-    async fn start(&self, request: Request<InstanceIdentifier>) -> Result<Response<()>, Status> {
-        debug!("received request: {:?}", request);
-        let (tx, rx) = Manager::create_oneshot_channel();
-
-        match self
-            .sender
-            .send(Event::InstanceStart(request.into_inner().id, tx))
-            .await
-        {
-            Ok(_) => {
-                return rx.await.unwrap();
-            }
-            Err(_) => {
-                return Err(Status::internal("could not send event to manager"));
-            }
-        }
+    async fn start(&self, _: Request<InstanceIdentifier>) -> Result<Response<()>, tonic::Status> {
+        Err(tonic::Status::unimplemented("not implemented"))
     }
 
-    async fn stop(&self, request: Request<InstanceIdentifier>) -> Result<Response<()>, Status> {
-        debug!("received request: {:?}", request);
+    async fn stop(
+        &self,
+        request: Request<InstanceIdentifier>,
+    ) -> Result<Response<()>, tonic::Status> {
+        log::debug!("received gRPC request: {:?}", request);
         let (tx, rx) = Manager::create_oneshot_channel();
 
         match self
@@ -76,13 +63,16 @@ impl InstanceService for InstanceListener {
                 return rx.await.unwrap();
             }
             Err(_) => {
-                return Err(Status::internal("could not send event to manager"));
+                return Err(tonic::Status::internal("could not send event to manager"));
             }
         }
     }
 
-    async fn destroy(&self, request: Request<InstanceIdentifier>) -> Result<Response<()>, Status> {
-        debug!("received request: {:?}", request);
+    async fn destroy(
+        &self,
+        request: Request<InstanceIdentifier>,
+    ) -> Result<Response<()>, tonic::Status> {
+        log::debug!("received gRPC request: {:?}", request);
         let (tx, rx) = Manager::create_oneshot_channel();
 
         match self
@@ -94,7 +84,7 @@ impl InstanceService for InstanceListener {
                 return rx.await.unwrap();
             }
             Err(_) => {
-                return Err(Status::internal("could not send event to manager"));
+                return Err(tonic::Status::internal("could not send event to manager"));
             }
         }
     }
