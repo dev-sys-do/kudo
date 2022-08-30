@@ -1,9 +1,9 @@
-use std::net::SocketAddr;
-
 use super::model::{Ressources, Type, Workload, WorkloadDTO, WorkloadError, WorkloadVector};
 use crate::etcd::EtcdClient;
 use crate::external_api::generic::filter::FilterService;
+use crate::external_api::namespace::service::NamespaceService;
 use serde_json;
+use std::net::SocketAddr;
 
 /// `WorkloadService` is a struct that inpired from Controllers Provider Modules architectures. It can be used as a service in the WorkloadController .A service can use other services.
 /// Properties:
@@ -13,6 +13,7 @@ use serde_json;
 pub struct WorkloadService {
     etcd_service: EtcdClient,
     filter_service: FilterService,
+    namespace_service: NamespaceService,
 }
 
 impl WorkloadService {
@@ -22,6 +23,9 @@ impl WorkloadService {
                 .await
                 .map_err(|err| WorkloadError::Etcd(err.to_string()))?,
             filter_service: FilterService::new(),
+            namespace_service: NamespaceService::new(etcd_address)
+                .await
+                .map_err(|_| WorkloadError::NamespaceService)?,
         };
         Ok(inner)
     }
@@ -31,6 +35,12 @@ impl WorkloadService {
         namespace: &str,
     ) -> Result<Workload, WorkloadError> {
         let id = self.id(workload_name, namespace);
+        //check if namespace exists
+        self.namespace_service
+            .namespace(namespace)
+            .await
+            .map_err(|_| WorkloadError::NamespaceNotFound)?;
+
         match self.etcd_service.get(&id).await {
             Some(workload) => {
                 let workload: Workload = serde_json::from_str(&workload)
