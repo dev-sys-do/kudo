@@ -10,14 +10,15 @@ use proto::scheduler::{
 use tokio::sync::{mpsc, Mutex};
 use tokio::time;
 use tokio::{sync::oneshot, task::JoinHandle};
-use tonic::{transport::Server, Response};
+use tonic::transport::Server;
 
 use crate::event::handlers::instance_create::InstanceCreateHandler;
 use crate::event::handlers::instance_destroy::InstanceDestroyHandler;
 use crate::event::handlers::instance_stop::InstanceStopHandler;
-use crate::event::Event;
 use crate::event::handlers::node_register::NodeRegisterHandler;
+use crate::event::handlers::node_status::NodeStatusHandler;
 use crate::event::handlers::node_unregister::NodeUnregisterHandler;
+use crate::event::Event;
 use crate::instance::listener::InstanceListener;
 use crate::node::listener::NodeListener;
 use crate::orchestrator::Orchestrator;
@@ -150,8 +151,8 @@ impl Manager {
                         NodeUnregisterHandler::handle(orchestrator.clone(), request.id, tx).await;
                     }
                     Event::NodeStatus(status, tx) => {
-                        info!("received node status event : {:?}", status);
-                        tx.send(Ok(())).await.unwrap();
+                        log::trace!("received node status event : {:?}", status);
+                        NodeStatusHandler::handle(orchestrator.clone(), status, tx).await;
                     }
                 }
             }
