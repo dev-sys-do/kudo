@@ -12,8 +12,9 @@ use tonic::{transport::Server, Response};
 
 use crate::instance::listener::InstanceListener;
 use crate::node::listener::NodeListener;
+use crate::node::Node;
 use crate::SchedulerError;
-use crate::{config::Config, storage::Storage, Event, Node};
+use crate::{config::Config, storage::Storage, Event};
 
 #[derive(Debug)]
 pub struct Manager {
