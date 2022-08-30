@@ -1,6 +1,15 @@
 use proto::controller::NodeState;
 use serde::{Deserialize, Serialize};
 
+/// `NodeStatus` is a structure that holds the status of a node registered in the cluster.
+///
+/// Properties:
+///
+/// * `id`: The id of the node.
+/// * `state`: The current life state of the node.
+/// * `status_description`: A text containing details on the status.
+/// * `resource`: The resource used by the node.
+/// * `instances`: A list of instances that are running on the node.
 #[derive(Deserialize, Serialize)]
 pub struct NodeStatus {
     pub id: String,
@@ -10,12 +19,25 @@ pub struct NodeStatus {
     pub instances: Vec<InstanceIdentifier>,
 }
 
+/// `Resource` is a structure that holds information about the resource used by the node.
+///
+/// Properties:
+///
+/// * `limit`: The maximum amount of resources that this node is allowed to use.
+/// * `usage`: The amount of resources currently being used by the node.
 #[derive(Deserialize, Serialize)]
 pub struct Resource {
     pub limit: Option<ResourceSummary>,
     pub usage: Option<ResourceSummary>,
 }
 
+/// `ResourceSummary` is a structure that holds information about physical resources.
+///
+/// Properties:
+///
+/// * `cpu`: A number in milliCPU that represents a CPU.
+/// * `memory`: A number in bytes that represents a memory space.
+/// * `disk`: A number in bytes that represents a disk space.
 #[derive(Deserialize, Serialize)]
 pub struct ResourceSummary {
     pub cpu: u64,
