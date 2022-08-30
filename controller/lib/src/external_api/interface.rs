@@ -1,5 +1,5 @@
 use super::namespace;
-use super::{instance, workload};
+use super::{instance, node, workload};
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use log::info;
@@ -34,6 +34,7 @@ impl ExternalAPIInterface {
                 .service(workload::controller::WorkloadController {}.services())
                 .service(namespace::controller::NamespaceController {}.services())
                 .service(instance::controller::InstanceController {}.services())
+                .service(node::controller::NodeController {}.services())
                 .wrap(Logger::default())
         })
         .workers(num_workers)
