@@ -5,7 +5,10 @@ use proto::{
     controller::node_service_client::NodeServiceClient,
     scheduler::{Instance, InstanceStatus, NodeStatus, Resource, ResourceSummary, Status},
 };
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{
+    mpsc::{self},
+    Mutex,
+};
 use tonic::Streaming;
 
 use crate::{
