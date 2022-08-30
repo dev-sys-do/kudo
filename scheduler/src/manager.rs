@@ -123,8 +123,8 @@ impl Manager {
                         InstanceCreateHandler::handle(orchestrator.clone(), instance, tx).await;
                     }
                     Event::InstanceStop(id, tx) => {
-                        info!("received instance stop event : {:?}", id);
-                        tx.send(Ok(Response::new(()))).unwrap();
+                        log::trace!("received instance stop event : {:?}", id);
+                        InstanceStopHandler::handle(orchestrator.clone(), id, tx).await;
                     }
                     Event::InstanceDestroy(id, tx) => {
                         info!("received instance destroy event : {:?}", id);
