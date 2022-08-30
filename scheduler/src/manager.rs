@@ -6,7 +6,7 @@ use log::{debug, info};
 use proto::controller::node_service_client::NodeServiceClient;
 use proto::scheduler::{
     instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
-    Instance, InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse,
+    InstanceStatus, NodeRegisterResponse, NodeUnregisterResponse,
 };
 use tokio::sync::{mpsc, Mutex};
 use tokio::time;
@@ -15,16 +15,15 @@ use tonic::{transport::Server, Response};
 
 use crate::instance::listener::InstanceListener;
 use crate::node::listener::NodeListener;
-use crate::node::Node;
+use crate::orchestrator::Orchestrator;
 use crate::SchedulerError;
 use crate::{config::Config, storage::Storage, Event};
 
 #[derive(Debug)]
 pub struct Manager {
-    instances: Arc<Storage<Instance>>,
-    nodes: Arc<Storage<Node>>,
     config: Arc<Config>,
     grpc_controller_client: Arc<Mutex<Option<NodeServiceClient<tonic::transport::Channel>>>>,
+    orchestrator: Arc<Mutex<Orchestrator>>,
 }
 
 impl Manager {
@@ -34,30 +33,16 @@ impl Manager {
     ///
     /// A new Manager struct
     pub fn new(config: Config) -> Self {
+        let config = Arc::new(config);
+        let nodes = Storage::new();
+
+        let orchestrator = Orchestrator::new(nodes, config.clone());
+
         Manager {
-            instances: Arc::new(Storage::new()),
-            nodes: Arc::new(Storage::new()),
-            config: Arc::new(config),
+            config,
             grpc_controller_client: Arc::new(Mutex::new(None)),
+            orchestrator: Arc::new(Mutex::new(orchestrator)),
         }
-    }
-
-    /// This function returns a reference to the instances storage.
-    ///
-    /// Returns:
-    ///
-    /// A reference to the instances storage.
-    pub fn instances(&self) -> Arc<Storage<Instance>> {
-        self.instances.clone()
-    }
-
-    /// This function returns a reference to the nodes storage.
-    ///
-    /// Returns:
-    ///
-    /// A reference to the nodes storage.
-    pub fn nodes(&self) -> Arc<Storage<Node>> {
-        self.nodes.clone()
     }
 
     /// It creates a gRPC server that listens on port 50051 and spawns a new thread to handle incoming
@@ -125,6 +110,7 @@ impl Manager {
     /// A JoinHandle<()>
     fn listen_events(&self, mut rx: mpsc::Receiver<Event>) -> JoinHandle<()> {
         info!("listening for incoming events ...");
+        let orchestrator = self.orchestrator.clone();
 
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
