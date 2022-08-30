@@ -7,6 +7,8 @@ pub enum WorkloadError {
     NameAlreadyExists(String),
     JsonToWorkload(String),
     WorkloadToJson(String),
+    NamespaceService,
+    NamespaceNotFound,
 }
 
 impl WorkloadError {
@@ -25,6 +27,11 @@ impl WorkloadError {
             WorkloadError::WorkloadToJson(err) => HttpResponse::InternalServerError().body(
                 format!("Error while converting the workload to JSON: {}", err),
             ),
+            WorkloadError::NamespaceService => HttpResponse::InternalServerError()
+                .body("Cannot create a NamespaceService instance"),
+            WorkloadError::NamespaceNotFound => {
+                HttpResponse::NotFound().body("Namespace not found")
+            }
         }
     }
 }
@@ -82,7 +89,7 @@ impl WorkloadVector {
         WorkloadVector { workloads }
     }
     pub fn to_http(&self) -> HttpResponse {
-        match serde_json::to_string(&self) {
+        match serde_json::to_string(&self.workloads) {
             Ok(json) => HttpResponse::Ok().body(json),
             Err(err) => HttpResponse::InternalServerError().body(format!(
                 "Error while converting the workload to json: {}",
