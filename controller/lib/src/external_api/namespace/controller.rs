@@ -108,6 +108,6 @@ impl NamespaceController {
         let namespace_name = params.into_inner();
 
         namespace_service.delete_namespace(&namespace_name).await;
-        HttpResponse::build(StatusCode::NO_CONTENT).body("Remove successfully")
+        HttpResponse::build(StatusCode::NO_CONTENT).body("{\"message\":\"Remove successfully\"}")
     }
 }

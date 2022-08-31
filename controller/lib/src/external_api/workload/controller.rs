@@ -158,6 +158,6 @@ impl WorkloadController {
         workload_service
             .delete_workload(&workload_id, &namespace)
             .await;
-        HttpResponse::build(StatusCode::NO_CONTENT).body("Remove successfully")
+        HttpResponse::build(StatusCode::NO_CONTENT).body("{\"message\":\"Remove successfully\"}")
     }
 }

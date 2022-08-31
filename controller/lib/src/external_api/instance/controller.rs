@@ -42,8 +42,10 @@ impl InstanceController {
             service::InstanceService::new(&data.grpc_address, &data.etcd_address)
                 .await
                 .map_err(|err| {
-                    HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(format!("Error creating instance service, {:?}", err))
+                    HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).body(format!(
+                        "{{\"error\":\"Error creating instance service, {:?}\"}}",
+                        err
+                    ))
                 })
                 .unwrap();
         let mut workload_service = WorkloadService::new(&data.etcd_address).await.unwrap();
@@ -59,12 +61,13 @@ impl InstanceController {
                 .await
                 {
                     Ok(_) => HttpResponse::build(StatusCode::CREATED)
-                        .body("Instance creating and starting..."),
+                        .body("{\"error\":\"Instance creating and starting...\"}"),
                     Err(_) => HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body("Internal Server Error"),
+                        .body("{\"error\":\"Internal Server Error\"}"),
                 }
             }
-            Err(_) => HttpResponse::build(StatusCode::NOT_FOUND).body("Workload not found"),
+            Err(_) => HttpResponse::build(StatusCode::NOT_FOUND)
+                .body("{\"error\":\"Workload not found\"}"),
         }
     }
     /// It deletes a instance from etcd and grpc.
@@ -91,11 +94,14 @@ impl InstanceController {
             .await
         {
             Ok(instance) => match instance_service.delete_instance(instance).await {
-                Ok(_) => HttpResponse::build(StatusCode::OK).body("Instance deleted"),
+                Ok(_) => {
+                    HttpResponse::build(StatusCode::OK).body("{\"error\":\"Instance deleted\"}")
+                }
                 Err(err) => HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(format!("Internal Server Error, {}", err)),
+                    .body(format!("{{\"error\":\"Internal Server Error, {}\"}}", err)),
             },
-            Err(_) => HttpResponse::build(StatusCode::NOT_FOUND).body("Instance not found"),
+            Err(_) => HttpResponse::build(StatusCode::NOT_FOUND)
+                .body("{\"error\":\"Instance not found\"}"),
         }
     }
 
@@ -117,8 +123,10 @@ impl InstanceController {
             service::InstanceService::new(&data.grpc_address, &data.etcd_address)
                 .await
                 .map_err(|err| {
-                    HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(format!("Error creating instance service, {:?}", err))
+                    HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).body(format!(
+                        "{{\"error\":\"Error creating instance service, {:?}\"}}",
+                        err
+                    ))
                 })
                 .unwrap();
         let (namespace, name) = params.into_inner();
@@ -151,8 +159,10 @@ impl InstanceController {
             service::InstanceService::new(&data.grpc_address, &data.etcd_address)
                 .await
                 .map_err(|err| {
-                    HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(format!("Error creating instance service, {:?}", err))
+                    HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).body(format!(
+                        "{{\"error\":\"Error creating instance service, {:?}\"}}",
+                        err
+                    ))
                 })
                 .unwrap();
 
