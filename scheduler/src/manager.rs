@@ -17,6 +17,7 @@ use crate::event::handlers::instance_destroy::InstanceDestroyHandler;
 use crate::event::handlers::instance_stop::InstanceStopHandler;
 use crate::event::handlers::node_register::NodeRegisterHandler;
 use crate::event::handlers::node_status::NodeStatusHandler;
+use crate::event::handlers::node_stream_crash::NodeStreamCrashHandler;
 use crate::event::handlers::node_unregister::NodeUnregisterHandler;
 use crate::event::Event;
 use crate::instance::listener::InstanceListener;
@@ -153,6 +154,10 @@ impl Manager {
                     Event::NodeStatus(status, tx) => {
                         log::trace!("received node status event : {:?}", status);
                         NodeStatusHandler::handle(orchestrator.clone(), status, tx).await;
+                    }
+                    Event::NodeStreamCrash(id) => {
+                        log::trace!("received node stream crash event : {:?}", id);
+                        NodeStreamCrashHandler::handle(orchestrator.clone(), id).await;
                     }
                 }
             }

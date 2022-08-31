@@ -38,4 +38,5 @@ pub enum Event {
         oneshot::Sender<Result<Response<NodeUnregisterResponse>, tonic::Status>>,
     ),
     NodeStatus(NodeStatus, mpsc::Sender<Result<(), tonic::Status>>),
+    NodeStreamCrash(NodeIdentifier),
 }
