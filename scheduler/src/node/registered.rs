@@ -10,7 +10,7 @@ use tonic::{Request, Streaming};
 
 use crate::{
     manager::Manager,
-    parser::{instance::InstanceParser, resource::ResourceParser},
+    parser::{instance::InstanceParser, resource::ResourceParser, status::StatusParser},
     storage::{IStorage, Storage},
     InstanceIdentifier, ProxyError,
 };
@@ -159,7 +159,7 @@ impl NodeRegistered {
             .ok_or(ProxyError::GrpcStreamNotFound)?
             .send(Ok(proto::controller::NodeStatus {
                 id: self.id.clone(),
-                state: self.node.status.into(),
+                state: StatusParser::to_node_state_controller(status).into(),
                 status_description: description.unwrap_or_else(|| "".to_string()),
                 resource: match self.node.status {
                     Status::Running => Some(ResourceParser::to_controller_resource(
