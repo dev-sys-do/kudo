@@ -18,3 +18,4 @@ confy = "0.4.0"
 anyhow = "1.0.62"
 thiserror = "1.0.32"
 async-stream = "0.3.3"
+uuid = { version="1.1.2", features = ["v4"] }

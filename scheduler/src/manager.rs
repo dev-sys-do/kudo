@@ -6,7 +6,7 @@ use log::{debug, info};
 use proto::controller::node_service_client::NodeServiceClient;
 use proto::scheduler::{
     instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
-    NodeRegisterResponse, NodeUnregisterResponse,
+    NodeUnregisterResponse,
 };
 use tokio::sync::{mpsc, Mutex};
 use tokio::time;
@@ -17,6 +17,7 @@ use crate::event::handlers::instance_create::InstanceCreateHandler;
 use crate::event::handlers::instance_destroy::InstanceDestroyHandler;
 use crate::event::handlers::instance_stop::InstanceStopHandler;
 use crate::event::Event;
+use crate::event::handlers::node_register::NodeRegisterHandler;
 use crate::instance::listener::InstanceListener;
 use crate::node::listener::NodeListener;
 use crate::orchestrator::Orchestrator;
@@ -115,6 +116,7 @@ impl Manager {
     fn listen_events(&self, mut rx: mpsc::Receiver<Event>) -> JoinHandle<()> {
         info!("listening for incoming events ...");
         let orchestrator = self.orchestrator.clone();
+        let controller_client = self.grpc_controller_client.clone();
 
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
@@ -132,10 +134,16 @@ impl Manager {
                         log::trace!("received instance destroy event : {:?}", id);
                         InstanceDestroyHandler::handle(orchestrator.clone(), id, tx).await;
                     }
-                    Event::NodeRegister(request, _, tx) => {
-                        info!("received node register event : {:?}", request);
-                        tx.send(Ok(Response::new(NodeRegisterResponse::default())))
-                            .unwrap();
+                    Event::NodeRegister(request, addr, tx) => {
+                        log::trace!("received node register event : {:?}", request);
+                        NodeRegisterHandler::handle(
+                            orchestrator.clone(),
+                            request.certificate,
+                            addr,
+                            controller_client.clone(),
+                            tx,
+                        )
+                        .await;
                     }
                     Event::NodeUnregister(request, tx) => {
                         info!("received node unregister event : {:?}", request);
