@@ -1,5 +1,6 @@
 use crate::etcd::EtcdClient;
 use crate::external_api::generic::filter::FilterService;
+use crate::external_api::workload::model::Workload;
 use serde_json;
 use std::net::SocketAddr;
 
@@ -110,6 +111,22 @@ impl NamespaceService {
 
     pub async fn delete_namespace(&mut self, namespace_name: &str) {
         let id = self.id(namespace_name);
+
+        match self.etcd_service.get_all().await {
+            Some(workloads) => {
+                for workload in workloads {
+                    // we remove all workloads in the namespace
+                    if let Ok(workload) = serde_json::from_str::<Workload>(&workload) {
+                        if workload.namespace == namespace_name {
+                            self.etcd_service
+                                .delete(&format!("{}.{}", namespace_name, workload.name))
+                                .await;
+                        }
+                    }
+                }
+            }
+            None => {}
+        };
         _ = self.etcd_service.delete(&id).await;
     }
     pub fn id(&mut self, namespace_name: &str) -> String {
