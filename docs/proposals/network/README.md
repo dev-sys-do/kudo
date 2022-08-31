@@ -33,20 +33,32 @@ iptables rules for a new node.
 let node_id = "node";
 let node_ip_addr = Ipv4Addr::from_str("10.0.0.1").unwrap();
 let node_ip_cidr = Ipv4Inet::new(node_ip_addr, 24).unwrap();
+let nodes_ips = Vec::new();
 
-let request = SetupNodeRequest::new(node_id.to_string(), node_ip_cidr);
+let request = SetupNodeRequest::new(node_id.to_string(), node_ip_cidr, nodes_ips);
 let response = setup_node(request).unwrap();
+
 println!("CNI name: {}", response.interface_name);
 ```
 
-After each node reboot, you need to reconfigure iptables running `setup_iptables` function from
-`node` module.
+After each node reboot, you need to reconfigure iptables running `setup_iptables` and
+`add_other_nodes` functions from `node` module.
 
 ```rust
 let node_id = "node";
 let request = SetupIptablesRequest::new(node_id.to_string());
 
+let other_node_id = "node2";
+let other_node_cluster_ip = Ipv4Inet::new(Ipv4Addr::from_str("10.0.1.1").unwrap(), 24).unwrap();
+let other_node_external_ip = Ipv4Addr::from_str("22.22.22.22").unwrap();
+let new_node_request = NodeRequest::new(
+    other_node_id.to_string(),
+    NodeRequest::new(other_node_cluster_ip, other_node_external_ip),
+)
+let nodes_ips = vec![new_node_request];
+
 setup_iptables(request).unwrap();
+add_other_nodes(nodes_ips).unwrap();
 ```
 
 ### Setup instance
@@ -81,6 +93,38 @@ module.
 let instance_id = "instance";
 let namespace_name = get_namespace_name(instance_id.to_string());
 println!("Namespace of {}: {}", instance_id, namespace_name);
+```
+
+### Add other nodes
+
+When a new node join the cluster, you need to call `new_node_in_cluster` function from `node`
+module.
+
+```rust
+let node_id = "node";
+let node_cluster_ip = Ipv4Inet::new(Ipv4Addr::from_str("10.0.1.1").unwrap(), 24).unwrap();
+let node_external_ip = Ipv4Addr::from_str("22.22.22.22").unwrap();
+let new_node_request = NodeRequest::new(
+    node_id.to_string(),
+    NodeIp::new(node_cluster_ip, node_external_ip),
+);
+
+new_node_in_cluster(new_node_request).unwrap();
+```
+
+And you have to run `delete_node_in_cluster` function from `node` module when a node leave the
+cluster.
+
+```rust
+let node_id = "node";
+let node_cluster_ip = Ipv4Inet::new(Ipv4Addr::from_str("10.0.1.1").unwrap(), 24).unwrap();
+let node_external_ip = Ipv4Addr::from_str("22.22.22.22").unwrap();
+let delete_node_request = NodeRequest::new(
+    node_id.to_string(),
+    NodeIp::new(node_cluster_ip, node_external_ip),
+);
+
+delete_node_in_cluster(delete_node_request).unwrap();
 ```
 
 ### Clean up
