@@ -27,18 +27,35 @@ impl NodeService for NodeListener {
         log::debug!("received gRPC request: {:?}", request);
 
         let mut stream = request.into_inner();
+        let mut node_id = None;
 
         // send each status to the manager
         loop {
             let (tx, mut rx) = Manager::create_mpsc_channel();
-            let message = stream.message().await?;
+            let message = match stream.message().await {
+                Ok(message) => message,
+                Err(err) => {
+                    if let Some(node_id) = node_id {
+                        log::error!("node status stream crashed: {:?}", node_id);
+
+                        // send the node stream node event to the manager
+                        self.sender.send(Event::NodeStreamCrash(node_id)).await.ok();
+                    }
+
+                    return Err(err);
+                }
+            };
 
             match message {
                 Some(node_status) => {
+                    if node_id.is_none() {
+                        node_id = Some(node_status.id.clone());
+                    }
+
                     self.sender
                         .send(Event::NodeStatus(node_status, tx.clone()))
                         .await
-                        .unwrap();
+                        .ok();
 
                     // wait for the manager to respond
                     if let Some(res) = rx.recv().await {
@@ -49,8 +66,6 @@ impl NodeService for NodeListener {
                     }
                 }
                 None => {
-                    log::error!("Node status stream closed");
-                    // todo: emit node crash event (get the node id from the first status)
                     return Ok(Response::new(()));
                 }
             }
