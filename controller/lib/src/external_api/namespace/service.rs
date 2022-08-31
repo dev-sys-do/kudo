@@ -100,6 +100,7 @@ impl NamespaceService {
         };
         let json = serde_json::to_string(&namespace)
             .map_err(|err| NamespaceError::NamespaceToJson(err.to_string()))?;
+        self.delete_namespace(namespace_name).await;
         self.etcd_service
             .put(&new_id, &json)
             .await
