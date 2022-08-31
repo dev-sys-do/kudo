@@ -1,9 +1,18 @@
+use crate::etcd::EtcdClient;
+use crate::external_api::namespace::model::{Metadata, Namespace};
+
 use super::namespace;
 use super::{instance, node, workload};
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use log::info;
 use std::net::SocketAddr;
+
+#[derive(Debug)]
+pub enum ExternalAPIInterfaceError {
+    EtcdError(etcd_client::Error),
+    SerdeError(serde_json::Error),
+}
 
 pub struct ExternalAPIInterface {}
 
@@ -18,7 +27,29 @@ impl ExternalAPIInterface {
         num_workers: usize,
         etcd_address: SocketAddr,
         grpc_address: String,
-    ) -> Self {
+    ) -> Result<Self, ExternalAPIInterfaceError> {
+        let mut etcd_client = EtcdClient::new(etcd_address.to_string())
+            .await
+            .map_err(ExternalAPIInterfaceError::EtcdError)?;
+
+        if etcd_client.get("namespace.default").await.is_none() {
+            info!("Creating default namespace");
+
+            let namespace = Namespace {
+                id: "namespace.default".to_string(),
+                name: "default".to_string(),
+                metadata: Metadata {},
+            };
+            etcd_client
+                .put(
+                    &namespace.id,
+                    &serde_json::to_string(&namespace)
+                        .map_err(ExternalAPIInterfaceError::SerdeError)?,
+                )
+                .await
+                .map_err(ExternalAPIInterfaceError::EtcdError)?;
+        }
+
         info!(
             "Starting {} HTTP worker(s) listening on {}",
             num_workers, address
@@ -44,6 +75,6 @@ impl ExternalAPIInterface {
         .await
         .unwrap();
 
-        Self {}
+        Ok(Self {})
     }
 }

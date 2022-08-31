@@ -26,7 +26,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         config.external_api.etcd_address,
         config.internal_api.grpc_client_addr,
     )
-    .await;
+    .await
+    .unwrap();
 
     Ok(())
 }
