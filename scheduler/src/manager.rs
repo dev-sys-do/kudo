@@ -6,7 +6,6 @@ use log::{debug, info};
 use proto::controller::node_service_client::NodeServiceClient;
 use proto::scheduler::{
     instance_service_server::InstanceServiceServer, node_service_server::NodeServiceServer,
-    NodeUnregisterResponse,
 };
 use tokio::sync::{mpsc, Mutex};
 use tokio::time;
@@ -18,6 +17,7 @@ use crate::event::handlers::instance_destroy::InstanceDestroyHandler;
 use crate::event::handlers::instance_stop::InstanceStopHandler;
 use crate::event::Event;
 use crate::event::handlers::node_register::NodeRegisterHandler;
+use crate::event::handlers::node_unregister::NodeUnregisterHandler;
 use crate::instance::listener::InstanceListener;
 use crate::node::listener::NodeListener;
 use crate::orchestrator::Orchestrator;
@@ -146,9 +146,8 @@ impl Manager {
                         .await;
                     }
                     Event::NodeUnregister(request, tx) => {
-                        info!("received node unregister event : {:?}", request);
-                        tx.send(Ok(Response::new(NodeUnregisterResponse::default())))
-                            .unwrap();
+                        log::trace!("received node unregister event : {:?}", request);
+                        NodeUnregisterHandler::handle(orchestrator.clone(), request.id, tx).await;
                     }
                     Event::NodeStatus(status, tx) => {
                         info!("received node status event : {:?}", status);
