@@ -15,23 +15,31 @@ pub enum WorkloadError {
 impl WorkloadError {
     pub fn to_http(&self) -> HttpResponse {
         match self {
-            WorkloadError::WorkloadNotFound => HttpResponse::NotFound().body("Workload not found"),
-            WorkloadError::Etcd(err) => {
-                HttpResponse::InternalServerError().body(format!("Etcd error: {} ", err))
+            WorkloadError::WorkloadNotFound => {
+                HttpResponse::NotFound().body("{\"error\":\"Workload not found\"}")
             }
-            WorkloadError::NameAlreadyExists(name) => {
-                HttpResponse::Conflict().body(format!("Workload with name {} already exists", name))
+            WorkloadError::Etcd(err) => HttpResponse::InternalServerError()
+                .body(format!("{{\"error\":\"Etcd error: {} \"}}", err)),
+            WorkloadError::NameAlreadyExists(name) => HttpResponse::Conflict().body(format!(
+                "{{\"error\":\"Workload with name {} already exists\"}}",
+                name
+            )),
+            WorkloadError::JsonToWorkload(err) => {
+                HttpResponse::InternalServerError().body(format!(
+                    "{{\"error\":\"Error while converting JSON string to Workload : {}\"}}",
+                    err
+                ))
             }
-            WorkloadError::JsonToWorkload(err) => HttpResponse::InternalServerError().body(
-                format!("Error while converting JSON string to workload : {}", err),
-            ),
-            WorkloadError::WorkloadToJson(err) => HttpResponse::InternalServerError().body(
-                format!("Error while converting the workload to JSON: {}", err),
-            ),
+            WorkloadError::WorkloadToJson(err) => {
+                HttpResponse::InternalServerError().body(format!(
+                    "{{\"error\":\"Error while converting the Workload to JSON: {}\"}}",
+                    err
+                ))
+            }
             WorkloadError::NamespaceService => HttpResponse::InternalServerError()
-                .body("Cannot create a NamespaceService instance"),
+                .body("{\"error\":\"Cannot create a NamespaceService instance\"}"),
             WorkloadError::NamespaceNotFound => {
-                HttpResponse::NotFound().body("Namespace not found")
+                HttpResponse::NotFound().body("{\"error\":\"Namespace not found\"}")
             }
         }
     }
@@ -67,7 +75,7 @@ impl Workload {
         match serde_json::to_string(&self) {
             Ok(json) => HttpResponse::Ok().body(json),
             Err(err) => HttpResponse::InternalServerError().body(format!(
-                "Error while converting the workload to json: {}",
+                "{{\"error\":\"Error while converting the Workload to JSON: {}\"}}",
                 err
             )),
         }
@@ -93,7 +101,7 @@ impl WorkloadVector {
         match serde_json::to_string(&self.workloads) {
             Ok(json) => HttpResponse::Ok().body(json),
             Err(err) => HttpResponse::InternalServerError().body(format!(
-                "Error while converting the workload to json: {}",
+                "{{\"error\":\"Error while converting the Workload to JSON: {}\"}}",
                 err
             )),
         }

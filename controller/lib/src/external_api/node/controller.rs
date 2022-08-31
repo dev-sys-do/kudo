@@ -26,8 +26,10 @@ impl NodeController {
         let mut node_service = NodeService::new(data.etcd_address)
             .await
             .map_err(|err| {
-                HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(format!("Error creating node service, {:?}", err))
+                HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).body(format!(
+                    "{{\"error\":\"Error creating node service, {:?}\"}}",
+                    err
+                ))
             })
             .unwrap();
         match node_service.get_node(&id).await {
@@ -35,11 +37,10 @@ impl NodeController {
                 HttpResponse::build(StatusCode::OK).body(serde_json::to_string(&node).unwrap())
             }
             Err(err) => match err {
-                NodeError::NodeNotFound => {
-                    HttpResponse::build(StatusCode::NOT_FOUND).body("Node not found")
-                }
+                NodeError::NodeNotFound => HttpResponse::build(StatusCode::NOT_FOUND)
+                    .body("{\"error\":\"Node not found\"}"),
                 _ => HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body("Internal Server Error"),
+                    .body("{\"error\":\"Internal Server Error\"}"),
             },
         }
     }
@@ -59,8 +60,10 @@ impl NodeController {
         let mut node_service = NodeService::new(data.etcd_address)
             .await
             .map_err(|err| {
-                HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
-                    .body(format!("Error creating node service, {:?}", err))
+                HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR).body(format!(
+                    "{{\"error\":\"Error creating node service, {:?}\"}}",
+                    err
+                ))
             })
             .unwrap();
         match pagination {
