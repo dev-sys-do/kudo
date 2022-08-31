@@ -14,6 +14,8 @@ use tokio::{sync::oneshot, task::JoinHandle};
 use tonic::{transport::Server, Response};
 
 use crate::event::handlers::instance_create::InstanceCreateHandler;
+use crate::event::handlers::instance_destroy::InstanceDestroyHandler;
+use crate::event::handlers::instance_stop::InstanceStopHandler;
 use crate::event::Event;
 use crate::instance::listener::InstanceListener;
 use crate::node::listener::NodeListener;
@@ -127,8 +129,8 @@ impl Manager {
                         InstanceStopHandler::handle(orchestrator.clone(), id, tx).await;
                     }
                     Event::InstanceDestroy(id, tx) => {
-                        info!("received instance destroy event : {:?}", id);
-                        tx.send(Ok(Response::new(()))).unwrap();
+                        log::trace!("received instance destroy event : {:?}", id);
+                        InstanceDestroyHandler::handle(orchestrator.clone(), id, tx).await;
                     }
                     Event::NodeRegister(request, _, tx) => {
                         info!("received node register event : {:?}", request);
