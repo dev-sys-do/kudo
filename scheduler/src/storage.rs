@@ -7,6 +7,7 @@ pub trait IStorage<T> {
     fn update(&mut self, id: &str, value: T);
     fn delete(&mut self, id: &str);
     fn get_all(&self) -> &HashMap<String, T>;
+    fn iter_mut(&mut self) -> std::collections::hash_map::IterMut<String, T>;
 }
 
 /// `Storage` is a generic type that stores a `HashMap` of `String` keys and `T` values.
@@ -82,6 +83,14 @@ impl<T> IStorage<T> for Storage<T> {
     /// A reference to the HashMap
     fn get_all(&self) -> &HashMap<String, T> {
         &self.data
+    }
+
+    /// It returns a mutable reference to the HashMap.
+    /// Returns:
+    ///
+    /// A mutable reference to the HashMap
+    fn iter_mut(&mut self) -> std::collections::hash_map::IterMut<String, T> {
+        self.data.iter_mut()
     }
 }
 
