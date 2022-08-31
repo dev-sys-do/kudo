@@ -181,6 +181,7 @@ impl WorkloadService {
         };
         let json = serde_json::to_string(&workload)
             .map_err(|err| WorkloadError::WorkloadToJson(err.to_string()))?;
+        self.delete_workload(workload_name, namespace).await;
         self.etcd_service
             .put(&new_id, &json)
             .await
