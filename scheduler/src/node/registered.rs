@@ -5,13 +5,17 @@ use proto::{
     controller::node_service_client::NodeServiceClient,
     scheduler::{Instance, Resource, Status},
 };
-use tokio::sync::{
-    mpsc::{self},
-    Mutex,
+use tokio::{
+    sync::{
+        mpsc::{self},
+        Mutex,
+    },
+    task::JoinHandle,
 };
 use tonic::{Request, Streaming};
 
 use crate::{
+    instance::scheduled::InstanceScheduled,
     manager::Manager,
     parser::{instance::InstanceParser, resource::ResourceParser, status::StatusParser},
     storage::{IStorage, Storage},
@@ -38,7 +42,8 @@ pub struct NodeRegistered {
     pub address: IpAddr,
     pub tx: Option<mpsc::Sender<Result<proto::controller::NodeStatus, tonic::Status>>>,
     pub grpc_client: Option<InstanceServiceClient<tonic::transport::Channel>>,
-    pub instances: Storage<Instance>,
+    pub status_thread: Option<JoinHandle<()>>,
+    pub instances: Storage<InstanceScheduled>,
 }
 
 impl NodeRegistered {
@@ -60,6 +65,7 @@ impl NodeRegistered {
             address,
             tx: None,
             grpc_client: None,
+            status_thread: None,
             instances: Storage::new(),
         }
     }
@@ -124,7 +130,7 @@ impl NodeRegistered {
 
         let request = Self::wrap_request(node_status_stream);
 
-        tokio::spawn(async move {
+        self.status_thread = Some(tokio::spawn(async move {
             client
                 .lock()
                 .await
@@ -132,9 +138,18 @@ impl NodeRegistered {
                 .unwrap()
                 .update_node_status(request)
                 .await
-        });
+                .ok();
+        }));
 
         Ok(())
+    }
+
+    /// This function closes the node status stream
+    pub fn close_node_status_stream(&mut self) {
+        self.tx = None;
+        if let Some(thread) = self.status_thread.take() {
+            thread.abort();
+        }
     }
 
     /// This function updates the status of the node and sends the updated status to the controller
@@ -265,6 +280,15 @@ impl NodeRegistered {
             .map_err(ProxyError::TonicStatusError)?;
 
         Ok(())
+    }
+
+    /// Delete an instance from the node.
+    ///
+    /// Arguments:
+    ///
+    /// * `id`: InstanceIdentifier - The identifier of the instance to delete.
+    pub fn delete_instance(&mut self, id: InstanceIdentifier) {
+        self.instances.delete(id.as_str());
     }
 
     /// This function takes a request and returns a request wrapped with tonic.
