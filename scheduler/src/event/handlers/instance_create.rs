@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    event::Event, orchestrator::Orchestrator, parser::port::StatusParser, InstanceIdentifier,
+    event::Event, orchestrator::Orchestrator, parser::status::StatusParser, InstanceIdentifier,
 };
 use anyhow::Result;
 use proto::scheduler::{Instance, InstanceStatus, Status};
