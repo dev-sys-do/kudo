@@ -26,6 +26,8 @@ pub enum Event {
         NodeIdentifier,
         oneshot::Sender<Result<Response<()>, tonic::Status>>,
     ),
+    InstanceTerminated(NodeIdentifier),
+    InstanceStreamCrash(NodeIdentifier),
 
     // Node events
     NodeRegister(

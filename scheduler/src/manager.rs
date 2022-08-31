@@ -15,6 +15,8 @@ use tonic::transport::Server;
 use crate::event::handlers::instance_create::InstanceCreateHandler;
 use crate::event::handlers::instance_destroy::InstanceDestroyHandler;
 use crate::event::handlers::instance_stop::InstanceStopHandler;
+use crate::event::handlers::instance_stream_crash::InstanceStreamCrashHandler;
+use crate::event::handlers::instance_terminated::InstanceTerminatedHandler;
 use crate::event::handlers::node_register::NodeRegisterHandler;
 use crate::event::handlers::node_status::NodeStatusHandler;
 use crate::event::handlers::node_stream_crash::NodeStreamCrashHandler;
@@ -111,11 +113,16 @@ impl Manager {
     /// Arguments:
     ///
     /// * `rx`: mpsc::Receiver<Event>
+    /// * `tx`: mpsc::Sender<Event>
     ///
     /// Returns:
     ///
     /// A JoinHandle<()>
-    fn listen_events(&self, mut rx: mpsc::Receiver<Event>) -> JoinHandle<()> {
+    fn listen_events(
+        &self,
+        mut rx: mpsc::Receiver<Event>,
+        tx_events: mpsc::Sender<Event>,
+    ) -> JoinHandle<()> {
         info!("listening for incoming events ...");
         let orchestrator = self.orchestrator.clone();
         let controller_client = self.grpc_controller_client.clone();
@@ -126,7 +133,13 @@ impl Manager {
                 match event {
                     Event::InstanceCreate(instance, tx) => {
                         info!("received instance create event : {:?}", instance);
-                        InstanceCreateHandler::handle(orchestrator.clone(), instance, tx).await;
+                        InstanceCreateHandler::handle(
+                            orchestrator.clone(),
+                            instance,
+                            tx,
+                            tx_events.clone(),
+                        )
+                        .await;
                     }
                     Event::InstanceStop(id, tx) => {
                         log::trace!("received instance stop event : {:?}", id);
@@ -135,6 +148,14 @@ impl Manager {
                     Event::InstanceDestroy(id, tx) => {
                         log::trace!("received instance destroy event : {:?}", id);
                         InstanceDestroyHandler::handle(orchestrator.clone(), id, tx).await;
+                    }
+                    Event::InstanceTerminated(id) => {
+                        log::trace!("received instance terminated event : {:?}", id);
+                        InstanceTerminatedHandler::handle(orchestrator.clone(), id).await;
+                    }
+                    Event::InstanceStreamCrash(id) => {
+                        log::trace!("received instance stream crash event : {:?}", id);
+                        InstanceStreamCrashHandler::handle(orchestrator.clone(), id).await;
                     }
                     Event::NodeRegister(request, addr, tx) => {
                         log::trace!("received node register event : {:?}", request);
@@ -201,13 +222,13 @@ impl Manager {
         let (tx, rx) = Self::create_mpsc_channel();
 
         // create listeners and serve the grpc server
-        handlers.push(self.create_grpc_server(tx)?);
+        handlers.push(self.create_grpc_server(tx.clone())?);
 
         // connect to the controller
         self.connect_to_controller().await;
 
         // listen for incoming events and pass them to the orchestrator
-        handlers.push(self.listen_events(rx));
+        handlers.push(self.listen_events(rx, tx));
 
         info!("scheduler running and ready to receive incoming requests ...");
 

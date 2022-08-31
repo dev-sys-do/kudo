@@ -1,6 +1,8 @@
 pub mod instance_create;
 pub mod instance_destroy;
 pub mod instance_stop;
+pub mod instance_stream_crash;
+pub mod instance_terminated;
 pub mod node_register;
 pub mod node_status;
 pub mod node_stream_crash;
