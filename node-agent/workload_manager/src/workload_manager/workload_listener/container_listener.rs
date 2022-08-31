@@ -67,7 +67,6 @@ impl ContainerListener {
             .await;
         debug!("got stats stream");
 
-
         let container_resources = container_resources_opt
             .ok_or(|e: Error| e)
             .map_err(
@@ -179,7 +178,6 @@ impl WorkloadListener for ContainerListener {
 
                 match new_instance_status {
                     Ok(instance_to_send) => {
-
                         if cached == instance_to_send {
                             continue;
                         }
@@ -193,7 +191,9 @@ impl WorkloadListener for ContainerListener {
                         if status == WorkloadStatus::Crashed as i32
                             || status == WorkloadStatus::Terminated as i32
                         {
-                            debug!("Listener is stopping because contained has crashed or terminated");
+                            debug!(
+                                "Listener is stopping because contained has crashed or terminated"
+                            );
                             break;
                         }
                     }
@@ -391,7 +391,11 @@ mod tests {
         let (tx, mut rx) = channel(1000);
 
         //test
-        crate::workload_manager::workload_listener::ContainerListener::run(container.clone().id, instance, tx.clone());
+        crate::workload_manager::workload_listener::ContainerListener::run(
+            container.clone().id,
+            instance,
+            tx.clone(),
+        );
 
         loop {
             let msg = rx.recv().await;

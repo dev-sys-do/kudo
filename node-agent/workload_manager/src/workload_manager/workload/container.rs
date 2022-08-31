@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use bollard::container::{
-    Config, KillContainerOptions, NetworkingConfig, RemoveContainerOptions, RenameContainerOptions,
+    Config, KillContainerOptions, RemoveContainerOptions, RenameContainerOptions,
     StopContainerOptions,
 };
 use bollard::Docker;
@@ -9,8 +9,8 @@ use bollard::Docker;
 use anyhow::{Context, Error, Result};
 
 use bollard::image::CreateImageOptions;
-use bollard::service::EndpointSettings;
 use futures_util::TryStreamExt;
+use log::{error, info};
 
 use super::workload_runner::NetworkSettings;
 use super::workload_trait::Workload;
@@ -130,54 +130,61 @@ impl Workload for Container {
 async fn create_container(
     docker: &Docker,
     instance: Instance,
-    network_settings: &NetworkSettings,
+    _network_settings: &NetworkSettings,
 ) -> Result<String> {
     let mut ports = HashMap::new();
     let port_list = &instance.ports;
     for port in port_list {
         ports.insert(
-            port.destination.to_string(),
+            format!("{}/tcp", port.source),
             Some(vec![bollard::service::PortBinding {
                 host_port: Some(port.source.to_string()),
                 ..Default::default()
             }]),
         );
     }
+    info!("{:?}", port_list);
 
-    let random_id = uuid::Uuid::new_v4().to_string();
+    // let random_id = uuid::Uuid::new_v4().to_string();
 
     let container_config: Config<&str> = Config {
         image: Some(instance.uri.as_str()),
         tty: Some(true),
         host_config: Some(bollard::service::HostConfig {
             port_bindings: Some(ports),
-            nano_cpus: instance
-                .resource
-                .clone()
-                .and_then(|resource| resource.limit.map(|limit| limit.cpu.try_into().unwrap())),
-            memory: instance
-                .resource
-                .clone()
-                .and_then(|resource| resource.limit.map(|limit| limit.memory.try_into().unwrap())),
+            nano_cpus: instance.resource.clone().and_then(|resource| {
+                resource
+                    .limit
+                    .and_then(|limit| i64::try_from(limit.cpu * 1000000).ok())
+            }),
+            memory: instance.resource.clone().and_then(|resource| {
+                resource
+                    .limit
+                    .and_then(|limit| i64::try_from(limit.memory * 1000000).ok())
+            }),
 
             ..Default::default()
         }),
-        networking_config: Some(NetworkingConfig {
-            endpoints_config: HashMap::from([(
-                random_id.as_str(),
-                EndpointSettings {
-                    links: Some(vec![network_settings.bridge_name.clone()]),
-                    ip_address: Some(instance.ip),
-                    ..Default::default()
-                },
-            )]),
-        }),
+        // networking_config: Some(NetworkingConfig {
+        //     endpoints_config: HashMap::from([(
+        //         random_id.as_str(),
+        //         EndpointSettings {
+        //             links: Some(vec![network_settings.bridge_name.clone()]),
+        //             ip_address: Some(instance.ip),
+        //             ..Default::default()
+        //         },
+        //     )]),
+        // }),
         ..Default::default()
     };
 
     let container_id = docker
         .create_container::<&str, &str>(None, container_config)
         .await
+        .map_err(|e| {
+            error!("Error creating container: {}", e);
+            e
+        })
         .context("Can't create container. ")?
         .id;
 

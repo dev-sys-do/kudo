@@ -1,13 +1,9 @@
 use std::env;
-use std::net::Ipv4Addr;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::thread::sleep;
 use std::time::Duration;
 
-use cidr::Ipv4Inet;
 use log::{debug, info, trace};
-use network::node::request::SetupNodeRequest;
 use tokio::sync::mpsc::channel;
 use tokio::sync::Mutex;
 use tokio::time;
@@ -18,7 +14,6 @@ use uuid::Uuid;
 mod config;
 
 use config::{GrpcServerConfig, NodeAgentConfig};
-use network::node::setup_node;
 use node_manager::NodeSystem;
 use workload_manager::workload_manager::WorkloadManager;
 
@@ -35,7 +30,6 @@ const NUMBER_OF_CONNECTION_ATTEMPTS: u16 = 10;
 
 ///
 /// This Struct implement the Instance service from Node Agent proto file
-///
 pub struct InstanceServiceController {
     workload_manager: Arc<Mutex<WorkloadManager>>,
 }
@@ -69,8 +63,7 @@ impl InstanceService for InstanceServiceController {
                 .await
                 .create(instance, channel.0.clone())
                 .await
-                .map_err(|err| Status::internal(format!("Workload creation error: {}", err)))
-                .unwrap();
+                .ok();
         });
 
         // send receiver to scheduler
@@ -102,7 +95,6 @@ impl InstanceService for InstanceServiceController {
 /// This function starts the grpc server of the Node Agent.
 /// The server listens and responds to requests from the Scheduler.
 /// The default port is 50053.
-///
 fn create_grpc_server(config: GrpcServerConfig, node_id: String) -> tokio::task::JoinHandle<()> {
     let addr = format!("{}:{}", config.host, config.port).parse().unwrap();
     let instance_service_controller = InstanceServiceController::new(node_id);
@@ -120,7 +112,6 @@ fn create_grpc_server(config: GrpcServerConfig, node_id: String) -> tokio::task:
 
 ///
 /// This function allows you to connect to the scheduler's grpc server.
-///
 async fn connect_to_scheduler(
     addr: String,
 ) -> Option<NodeServiceClient<tonic::transport::Channel>> {
@@ -129,7 +120,6 @@ async fn connect_to_scheduler(
 
 ///
 /// This function allows you to register to the scheduler's grpc server.
-///
 async fn register_to_scheduler(
     client: &mut NodeServiceClient<tonic::transport::Channel>,
     certificate: String,
@@ -141,7 +131,6 @@ async fn register_to_scheduler(
 
 ///
 /// This function allows you to send node status to the scheduler's grpc server.
-///
 async fn send_node_status_to_scheduler(
     client: &mut NodeServiceClient<tonic::transport::Channel>,
     node_system_arc: Arc<Mutex<NodeSystem>>,
@@ -192,7 +181,6 @@ async fn send_node_status_to_scheduler(
 /// This function launch the Node Agent grpc client.
 /// First, the client registered to the Scheduler.
 /// Secondaly, once connected to it, it's send node resources to the Scheduler.
-///
 fn create_grpc_client(config: GrpcServerConfig, node_id: String) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         //  Connection to the Scheduler's grpc server
