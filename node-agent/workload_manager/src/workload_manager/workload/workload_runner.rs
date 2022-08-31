@@ -1,4 +1,4 @@
-use super::{container::Container, workload_trait::Workload};
+use super::container::Container;
 use anyhow::Result;
 use proto::agent::{Instance, Type};
 

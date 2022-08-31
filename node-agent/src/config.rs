@@ -5,7 +5,6 @@ use serde_derive::{Deserialize, Serialize};
 ///
 /// server: node agent grpc server config
 /// client: scheduler grpc server config
-///
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NodeAgentConfig {
     pub server: GrpcServerConfig,
@@ -17,7 +16,6 @@ pub struct NodeAgentConfig {
 ///
 /// host: ip or address of the grpc server
 /// port: grpc server's port
-///
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GrpcServerConfig {
     pub host: String,
@@ -40,23 +38,23 @@ impl Default for NodeAgentConfig {
     }
 }
 
-/// new function: allows you to define custom server and client configurations
-impl NodeAgentConfig {
-    pub fn new(
-        server_host: String,
-        server_port: u16,
-        client_host: String,
-        client_port: u16,
-    ) -> Self {
-        Self {
-            server: GrpcServerConfig {
-                host: server_host,
-                port: server_port,
-            },
-            client: GrpcServerConfig {
-                host: client_host,
-                port: client_port,
-            },
-        }
-    }
-}
+// / new function: allows you to define custom server and client configurations
+// impl NodeAgentConfig {
+//     pub fn new(
+//         server_host: String,
+//         server_port: u16,
+//         client_host: String,
+//         client_port: u16,
+//     ) -> Self {
+//         Self {
+//             server: GrpcServerConfig {
+//                 host: server_host,
+//                 port: server_port,
+//             },
+//             client: GrpcServerConfig {
+//                 host: client_host,
+//                 port: client_port,
+//             },
+//         }
+//     }
+// }

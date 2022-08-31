@@ -29,7 +29,7 @@ impl WorkloadManager {
     /// Creates an empty WorkloadManager
     pub fn new(node_id: String) -> Self {
         info!("Creating WorkloadManager");
-        WorkloadManager{
+        WorkloadManager {
             node_id,
             workloads: HashMap::new(),
             ..WorkloadManager::default()
@@ -43,12 +43,34 @@ impl WorkloadManager {
     pub async fn create(&mut self, instance: Instance, sender: StreamSender) -> Result<(), Status> {
         let workload_id = instance.clone().id;
 
+        sender
+            .send(Ok(InstanceStatus {
+                id: workload_id.clone(),
+                status: WorkloadStatus::Starting.into(),
+                description: "".to_string(),
+                resource: None,
+            }))
+            .await
+            .ok();
+
         //Create a workload and it's listener
         let runner = WorkloadRunner::new(self.node_id.clone());
 
         let workload = match runner.run(instance.clone()).await {
             Ok(wrkld) => wrkld,
-            Err(e) => return Err(Status::internal(e.to_string())),
+            Err(e) => {
+                sender
+                    .send(Ok(InstanceStatus {
+                        id: workload_id,
+                        status: WorkloadStatus::Failed.into(),
+                        description: format!("Error while starting workload: {}", e),
+                        resource: None,
+                    }))
+                    .await
+                    .ok();
+
+                return Err(Status::internal("Failed to create workload"));
+            }
         };
         info!("Workload {} created", workload_id);
 
@@ -57,12 +79,15 @@ impl WorkloadManager {
         info!("Workload {} listener created", workload_id);
 
         self.workloads.insert(workload_id.clone(), workload);
-        
-        sender.send(Ok(InstanceStatus{ 
-            id: workload_id.clone(),
-            status: WorkloadStatus::Starting as i32,
-            ..InstanceStatus::default() }
-        )).await.unwrap_or(());
+
+        sender
+            .send(Ok(InstanceStatus {
+                id: workload_id.clone(),
+                status: WorkloadStatus::Starting as i32,
+                ..InstanceStatus::default()
+            }))
+            .await
+            .unwrap_or(());
 
         self.senders.insert(workload_id, sender);
 
@@ -96,7 +121,8 @@ impl WorkloadManager {
             .get(&workload_id.clone())
             .unwrap()
             .send(Ok(status_stopping))
-            .await.unwrap_or(());
+            .await
+            .unwrap_or(());
 
         let status_destroying = InstanceStatus {
             id: workload_id.clone(),
@@ -110,9 +136,7 @@ impl WorkloadManager {
             ..Default::default()
         };
 
-        let sender = self.senders
-        .get(&workload_id.clone())
-        .unwrap();
+        let sender = self.senders.get(&workload_id.clone()).unwrap();
 
         match signal_instruction.signal {
             // Status::Stop
