@@ -1,5 +1,5 @@
 use super::request::Client;
-use crate::resource::workload;
+use crate::{client::request::check_count_exists_for_list, resource::workload};
 use anyhow::{Context, Result};
 use log::debug;
 use reqwest::Method;
@@ -17,7 +17,6 @@ pub struct Node {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetNodesResponse {
-    pub count: u64,
     pub nodes: Vec<Node>,
     #[serde(skip)]
     pub show_header: bool,
@@ -29,12 +28,15 @@ pub async fn list(client: &Client) -> Result<GetNodesResponse> {
         .send_json_request::<GetNodesResponse, ()>("/node", Method::GET, None)
         .await
         .context("Error getting nodes")?;
+
+    let count = check_count_exists_for_list(&response)?;
+
     debug!(
         "{} total nodes, {} nodes received ",
-        response.count,
-        response.nodes.len()
+        count,
+        response.data.nodes.len()
     );
-    Ok(response)
+    Ok(response.data)
 }
 
 /// Get the node with the given id.
@@ -42,7 +44,8 @@ pub async fn get(client: &Client, node_id: &str) -> Result<Node> {
     let response = (*client)
         .send_json_request::<Node, ()>(&format!("/node/{}", node_id), Method::GET, None)
         .await
-        .context("Error getting node")?;
+        .context("Error getting node")?
+        .data;
     debug!("Node {} received", response.id);
     Ok(response)
 }

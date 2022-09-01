@@ -3,6 +3,8 @@ use log::debug;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 
+use crate::client::request::check_count_exists_for_list;
+
 use super::request::Client;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -13,7 +15,6 @@ pub struct Namespace {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetNamespacesResponse {
-    pub count: u64,
     pub namespaces: Vec<Namespace>,
     #[serde(skip)]
     pub show_header: bool,
@@ -25,12 +26,13 @@ pub async fn list(client: &Client) -> Result<GetNamespacesResponse> {
         .send_json_request::<GetNamespacesResponse, ()>("/namespace", Method::GET, None)
         .await
         .context("Error getting nodes")?;
+    let count = check_count_exists_for_list(&response)?;
     debug!(
         "{} total namespaces, {} namespaces received ",
-        response.count,
-        response.namespaces.len()
+        count,
+        response.data.namespaces.len()
     );
-    Ok(response)
+    Ok(response.data)
 }
 
 /// Delete an namespace with the given id.

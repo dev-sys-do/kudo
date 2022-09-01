@@ -3,7 +3,10 @@ use log::debug;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 
-use crate::{client::types::IdResponse, resource::workload};
+use crate::{
+    client::{request::check_count_exists_for_list, types::IdResponse},
+    resource::workload,
+};
 
 use super::request::Client;
 
@@ -25,7 +28,8 @@ pub async fn create(client: &Client, namespace: &str, workload_id: &str) -> anyh
             }),
         )
         .await
-        .context("Error creating instance")?;
+        .context("Error creating instance")?
+        .data;
     debug!("Instance {} created", response.id);
     Ok(response.id)
 }
@@ -44,7 +48,6 @@ pub struct Instance {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct GetInstancesResponse {
-    pub count: u64,
     pub instances: Vec<Instance>,
 
     /// used for formatting in the Display impl
@@ -54,7 +57,7 @@ pub struct GetInstancesResponse {
 
 /// List the instances in the cluster.
 pub async fn list(client: &Client, namespace: &str) -> anyhow::Result<GetInstancesResponse> {
-    let response: GetInstancesResponse = (*client)
+    let response = (*client)
         .send_json_request::<GetInstancesResponse, ()>(
             format!("/instance/{}", namespace).as_str(),
             Method::GET,
@@ -62,12 +65,15 @@ pub async fn list(client: &Client, namespace: &str) -> anyhow::Result<GetInstanc
         )
         .await
         .context("Error getting instances")?;
+
+    let count = check_count_exists_for_list(&response)?;
+
     debug!(
         "{} total instances, {} instances received ",
-        response.count,
-        response.instances.len()
+        count,
+        response.data.instances.len()
     );
-    Ok(response)
+    Ok(response.data)
 }
 
 /// Get info about one instance.
@@ -79,7 +85,8 @@ pub async fn get(client: &Client, namespace: &str, instance_id: &str) -> anyhow:
             None,
         )
         .await
-        .context("Error getting instance")?;
+        .context("Error getting instance")?
+        .data;
     debug!("Instance {} received", response.id);
     Ok(response)
 }

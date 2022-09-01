@@ -4,7 +4,7 @@ use reqwest::Method;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    client::types::IdResponse,
+    client::{request::check_count_exists_for_list, types::IdResponse},
     resource::workload::{self, Resources},
 };
 
@@ -76,7 +76,8 @@ pub async fn create(
             Method::PUT,
             Some(&workload_body),
         )
-        .await?;
+        .await?
+        .data;
     debug!("Workload {} created", response.id);
     Ok(response.id)
 }
@@ -95,7 +96,8 @@ pub async fn update(
             Method::PATCH,
             Some(workload),
         )
-        .await?;
+        .await?
+        .data;
     debug!("Workload {} updated", response.id);
     Ok(response.id)
 }
@@ -111,7 +113,8 @@ pub async fn get(client: &Client, namespace: &str, workload_id: &str) -> Result<
             None,
         )
         .await
-        .context("Error getting workload")?;
+        .context("Error getting workload")?
+        .data;
     Ok(response)
 }
 
@@ -127,7 +130,7 @@ pub struct GetWorkloadResponse {
 ///
 /// Returns a vector of workloads.
 pub async fn list(client: &Client, namespace: &str) -> Result<GetWorkloadResponse> {
-    let response: GetWorkloadResponse = (*client)
+    let response = (*client)
         .send_json_request::<GetWorkloadResponse, ()>(
             format!("/workload/{}", namespace).as_str(),
             Method::GET,
@@ -135,12 +138,15 @@ pub async fn list(client: &Client, namespace: &str) -> Result<GetWorkloadRespons
         )
         .await
         .context("Error getting workloads")?;
+
+    let count = check_count_exists_for_list(&response)?;
+
     debug!(
         "{} total workloads, {} workloads received ",
-        response.count,
-        response.workloads.len()
+        count,
+        response.data.workloads.len()
     );
-    Ok(response)
+    Ok(response.data)
 }
 
 /// Delete a workload.
@@ -152,7 +158,9 @@ pub async fn delete(client: &Client, id: &str) -> Result<()> {
             None,
         )
         .await
-        .context("Error deleting workload")?;
+        .context("Error deleting workload")?
+        .data;
+
     debug!("Workload {} deleted", response.id);
     Ok(())
 }

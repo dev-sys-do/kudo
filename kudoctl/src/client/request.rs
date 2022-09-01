@@ -1,9 +1,39 @@
 use crate::config::Config;
+use log::debug;
 use reqwest::header;
 use reqwest::Response;
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde::Serialize;
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct KudoResponse<T> {
+    pub data: T,
+    pub metadata: Metadata,
+}
+
+impl<T> KudoResponse<T> {
+    pub fn error(&self) -> &Option<String> {
+        &self.metadata.error
+    }
+
+    pub fn count(&self) -> Option<u64> {
+        self.metadata.count
+    }
+
+    #[allow(dead_code)]
+    pub fn message(&self) -> Option<String> {
+        self.metadata.message.to_owned()
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+
+pub struct Metadata {
+    pub error: Option<String>,
+    pub message: Option<String>,
+    pub count: Option<u64>,
+}
 
 // Represent the error returned by the controller when a request fails
 #[derive(Deserialize)]
@@ -23,6 +53,7 @@ pub enum RequestError {
     ErrStatusCode(ErrStatusCode),
     ReqwestError(reqwest::Error),
     ParseError(url::ParseError),
+    MalformedResponse(String),
 }
 
 impl std::error::Error for RequestError {}
@@ -39,6 +70,7 @@ impl std::fmt::Display for RequestError {
             }
             RequestError::ReqwestError(err) => write!(f, "Reqwest error: {}", err),
             RequestError::ParseError(err) => write!(f, "Url parse error: {}", err),
+            RequestError::MalformedResponse(err) => write!(f, "Malformed response: {}", err),
         }
     }
 }
@@ -100,7 +132,7 @@ impl Client {
         endpoint: &str,
         method: reqwest::Method,
         body: Option<&U>,
-    ) -> Result<T, RequestError> {
+    ) -> Result<KudoResponse<T>, RequestError> {
         let response = self.send_request(endpoint, method, body).await?;
 
         // Check if the response is an error.
@@ -118,8 +150,20 @@ impl Client {
         }
 
         response
-            .json::<T>()
+            .json::<KudoResponse<T>>()
             .await
             .map_err(RequestError::ReqwestError)
+    }
+}
+
+pub fn check_count_exists_for_list<T>(response: &KudoResponse<T>) -> Result<u64, RequestError> {
+    match response.count() {
+        Some(count) => Ok(count),
+        None => {
+            debug!("No count found in response");
+            Err(RequestError::MalformedResponse(
+                "Count not found in response".to_string(),
+            ))
+        }
     }
 }
