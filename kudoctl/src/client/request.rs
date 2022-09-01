@@ -7,14 +7,20 @@ use serde::Deserialize;
 use serde::Serialize;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct KudoResponse<T> {
+pub struct KudoResponse<T>
+where
+    T: std::fmt::Debug,
+{
     pub data: T,
     pub metadata: Metadata,
 }
 
-impl<T> KudoResponse<T> {
-    pub fn error(&self) -> &Option<String> {
-        &self.metadata.error
+impl<T> KudoResponse<T>
+where
+    T: std::fmt::Debug,
+{
+    pub fn error(&self) -> Option<String> {
+        self.metadata.error.to_owned()
     }
 
     pub fn count(&self) -> Option<u64> {
@@ -33,12 +39,6 @@ pub struct Metadata {
     pub error: Option<String>,
     pub message: Option<String>,
     pub count: Option<u64>,
-}
-
-// Represent the error returned by the controller when a request fails
-#[derive(Deserialize)]
-struct ErrorResponse {
-    pub error: String,
 }
 
 // Error returned by this module when an endpoint returns an error.
@@ -132,31 +132,40 @@ impl Client {
         endpoint: &str,
         method: reqwest::Method,
         body: Option<&U>,
-    ) -> Result<KudoResponse<T>, RequestError> {
+    ) -> Result<KudoResponse<T>, RequestError>
+    where
+        T: std::fmt::Debug,
+    {
         let response = self.send_request(endpoint, method, body).await?;
+        let status = response.status();
 
-        // Check if the response is an error.
-        if !response.status().is_success() {
-            let status = response.status().as_u16();
-
-            // Read the error message from the response body.
-
-            let error_response: ErrorResponse =
-                response.json().await.map_err(RequestError::ReqwestError)?;
-            return Err(RequestError::ErrStatusCode(ErrStatusCode {
-                error: error_response.error,
-                status,
-            }));
-        }
-
-        response
+        let body = response
             .json::<KudoResponse<T>>()
             .await
-            .map_err(RequestError::ReqwestError)
+            .map_err(RequestError::ReqwestError)?;
+
+        // Check if the response is an error.
+        if !status.is_success() {
+            let status = status.as_u16();
+
+            // Read the error message from the response body.
+            return match body.error() {
+                Some(error) => Err(RequestError::ErrStatusCode(ErrStatusCode { error, status })),
+                None => Err(RequestError::MalformedResponse(format!(
+                    "Malformed response: {:?}.",
+                    body,
+                ))),
+            };
+        }
+
+        Ok(body)
     }
 }
 
-pub fn check_count_exists_for_list<T>(response: &KudoResponse<T>) -> Result<u64, RequestError> {
+pub fn check_count_exists_for_list<T>(response: &KudoResponse<T>) -> Result<u64, RequestError>
+where
+    T: std::fmt::Debug,
+{
     match response.count() {
         Some(count) => Ok(count),
         None => {
