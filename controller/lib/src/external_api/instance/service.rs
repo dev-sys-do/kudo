@@ -1,16 +1,17 @@
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
+use std::time::Duration;
 
-use super::filter::InstanceFilterService;
 use super::model::Instance;
 use crate::etcd::{EtcdClient, EtcdClientError};
+use crate::external_api::generic::filter::FilterService;
 use crate::external_api::workload::model::Workload;
 use crate::grpc_client::interface::{SchedulerClientInterface, SchedulerClientInterfaceError};
 use log::{debug, trace};
 use proto::controller::InstanceState;
 use serde_json;
 use thiserror::Error;
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, time};
 use tonic::{Request, Status};
 
 #[derive(Debug, Error)]
@@ -32,7 +33,7 @@ pub enum InstanceServiceError {
 pub struct InstanceService {
     grpc_service: SchedulerClientInterface,
     etcd_service: EtcdClient,
-    filter_service: InstanceFilterService,
+    filter_service: FilterService,
 }
 
 // `InstanceService` is a struct that is inspired from Controllers Provider Modules architectures. It is used as a service in the InstanceController. A service can use other services.
@@ -46,15 +47,19 @@ impl InstanceService {
     pub async fn new(
         grpc_address: &str,
         etcd_address: &SocketAddr,
+        grpc_client_connection_max_retries: u32,
     ) -> Result<Self, InstanceServiceError> {
         Ok(InstanceService {
-            grpc_service: SchedulerClientInterface::new(grpc_address.to_string())
-                .await
-                .map_err(InstanceServiceError::SchedulerClientInterfaceError)?,
+            grpc_service: SchedulerClientInterface::new(
+                grpc_address.to_string(),
+                grpc_client_connection_max_retries,
+            )
+            .await
+            .map_err(InstanceServiceError::SchedulerClientInterfaceError)?,
             etcd_service: EtcdClient::new(etcd_address.to_string())
                 .await
                 .map_err(InstanceServiceError::EtcdError)?,
-            filter_service: InstanceFilterService::new(),
+            filter_service: FilterService::new(),
         })
     }
 
@@ -149,6 +154,8 @@ impl InstanceService {
     pub fn schedule_instance(this: Arc<Mutex<Self>>, mut instance: Instance) {
         //Spawn a thread to start the instance
         tokio::spawn(async move {
+            let mut cooldown = 1;
+
             loop {
                 let mut stream = this
                     .clone()
@@ -196,8 +203,9 @@ impl InstanceService {
                 }
 
                 instance.num_restarts += 1;
-
-                debug!("Restarting instance {}", instance.id);
+                debug!("Restarting instance {} in {}s", instance.id, cooldown);
+                time::sleep(Duration::from_secs(cooldown)).await;
+                cooldown *= 2;
 
                 this.clone()
                     .lock()

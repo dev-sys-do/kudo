@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use crate::external_api::generic::model::{APIResponse, APIResponseMetadata};
+use crate::external_api::generic::model::{APIResponse, APIResponseMetadata, Pagination};
 use crate::external_api::interface::ActixAppState;
 use crate::external_api::workload::controller::WorkloadControllerError;
 use crate::external_api::workload::service::WorkloadServiceError;
 
 use super::super::workload::service::WorkloadService;
-use super::model::{Instance, InstanceDTO, InstanceVector, Pagination};
+use super::model::{Instance, InstanceDTO};
 use super::service::{InstanceService, InstanceServiceError};
 use actix_web::http::StatusCode;
 use actix_web::{web, HttpResponse, Responder, Scope};
@@ -89,13 +89,18 @@ impl InstanceController {
         body: web::Json<InstanceDTO>,
         data: web::Data<ActixAppState>,
     ) -> impl Responder {
-        let instance_service =
-            match InstanceService::new(&data.grpc_address, &data.etcd_address).await {
-                Ok(service) => service,
-                Err(err) => {
-                    return InstanceControllerError::InstanceServiceError(err).into();
-                }
-            };
+        let instance_service = match InstanceService::new(
+            &data.grpc_address,
+            &data.etcd_address,
+            data.grpc_client_connection_max_retries,
+        )
+        .await
+        {
+            Ok(service) => service,
+            Err(err) => {
+                return InstanceControllerError::InstanceServiceError(err).into();
+            }
+        };
 
         let mut workload_service = match WorkloadService::new(&data.etcd_address).await {
             Ok(service) => service,
@@ -142,13 +147,18 @@ impl InstanceController {
         params: web::Path<(String, String)>,
         data: web::Data<ActixAppState>,
     ) -> impl Responder {
-        let mut instance_service =
-            match InstanceService::new(&data.grpc_address, &data.etcd_address).await {
-                Ok(service) => service,
-                Err(err) => {
-                    return InstanceControllerError::InstanceServiceError(err).into();
-                }
-            };
+        let mut instance_service = match InstanceService::new(
+            &data.grpc_address,
+            &data.etcd_address,
+            data.grpc_client_connection_max_retries,
+        )
+        .await
+        {
+            Ok(service) => service,
+            Err(err) => {
+                return InstanceControllerError::InstanceServiceError(err).into();
+            }
+        };
 
         let (namespace, name) = params.into_inner();
         match instance_service
@@ -183,13 +193,18 @@ impl InstanceController {
         params: web::Path<(String, String)>,
         data: web::Data<ActixAppState>,
     ) -> impl Responder {
-        let mut instance_service =
-            match InstanceService::new(&data.grpc_address, &data.etcd_address).await {
-                Ok(service) => service,
-                Err(err) => {
-                    return InstanceControllerError::InstanceServiceError(err).into();
-                }
-            };
+        let mut instance_service = match InstanceService::new(
+            &data.grpc_address,
+            &data.etcd_address,
+            data.grpc_client_connection_max_retries,
+        )
+        .await
+        {
+            Ok(service) => service,
+            Err(err) => {
+                return InstanceControllerError::InstanceServiceError(err).into();
+            }
+        };
 
         let (namespace, name) = params.into_inner();
         match instance_service
@@ -216,27 +231,31 @@ impl InstanceController {
         pagination: Option<web::Query<Pagination>>,
         data: web::Data<ActixAppState>,
     ) -> impl Responder {
-        let mut instance_service =
-            match InstanceService::new(&data.grpc_address, &data.etcd_address).await {
-                Ok(service) => service,
-                Err(err) => {
-                    return InstanceControllerError::InstanceServiceError(err).into();
-                }
-            };
+        let mut instance_service = match InstanceService::new(
+            &data.grpc_address,
+            &data.etcd_address,
+            data.grpc_client_connection_max_retries,
+        )
+        .await
+        {
+            Ok(service) => service,
+            Err(err) => {
+                return InstanceControllerError::InstanceServiceError(err).into();
+            }
+        };
 
-        match pagination {
+        let instances = match pagination {
             Some(pagination) => {
-                let instances = instance_service
+                instance_service
                     .get_instances(pagination.limit, pagination.offset, &namespace)
-                    .await;
-
-                InstanceVector::new(instances).to_http()
+                    .await
             }
-            None => {
-                let instances = instance_service.get_instances(0, 0, &namespace).await;
+            None => instance_service.get_instances(0, 0, &namespace).await,
+        };
 
-                InstanceVector::new(instances).to_http()
-            }
-        }
+        HttpResponse::build(StatusCode::OK).json(APIResponse::<Vec<Instance>> {
+            data: instances,
+            metadata: APIResponseMetadata::default(),
+        })
     }
 }
